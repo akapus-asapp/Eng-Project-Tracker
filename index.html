@@ -24,11 +24,16 @@
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
   .card { background: #fff; border-radius: 10px; padding: 20px; border: 1px solid #E5E9F0; }
   .card-title { font-size: 14px; font-weight: 600; color: #1A1A2E; margin-bottom: 14px; }
-  .insight { padding: 10px 14px; border-radius: 6px; margin-bottom: 8px; font-size: 13px; line-height: 1.6; border-left: 3px solid; }
+  .insight { padding: 10px 14px; border-radius: 6px; margin-bottom: 8px; font-size: 13px; line-height: 1.6; border-left: 3px solid; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
   .insight.red { background: #FEF2F2; border-color: #E24B4A; }
   .insight.amber { background: #FFFBEB; border-color: #EF9F27; }
   .insight.green { background: #F0FDF4; border-color: #639922; }
   .insight.blue { background: #EFF6FF; border-color: #378ADD; }
+  .insight-clickable { cursor: pointer; transition: filter .12s; }
+  .insight-clickable:hover { filter: brightness(.96); }
+  .insight-active { outline: 2px solid #185FA5; }
+  .insight-cta { font-size: 11px; font-weight: 600; white-space: nowrap; opacity: .65; flex-shrink: 0; }
+  .insight-clickable:hover .insight-cta { opacity: 1; }
   .tab-bar { display: flex; gap: 4px; margin-bottom: 14px; flex-wrap: wrap; }
   .tab { padding: 5px 12px; border-radius: 100px; border: 1px solid #D0D5DD; background: #fff; cursor: pointer; font-size: 12px; color: #666; font-weight: 500; }
   .tab.active { background: #185FA5; color: #fff; border-color: #185FA5; }
@@ -208,30 +213,76 @@ function renderInsights() {
 
   const lb = DATA.filter(d => d.Status === 'Blocked' && d['Days in Cur Status'] >= 30)
     .sort((a,b)=>(b['Days in Cur Status']||0)-(a['Days in Cur Status']||0));
-  if (lb.length) ins.push({t:'red', m:`<strong>${lb.length} epic${lb.length>1?'s have':' has'} been Blocked 30+ days.</strong> Longest: <strong>${lb[0].Key}</strong> — ${lb[0]['Epic Name']} (${lb[0]['Days in Cur Status']} days). Needs escalation.`});
+  if (lb.length) ins.push({t:'red',
+    m:`<strong>${lb.length} epic${lb.length>1?'s have':' has'} been Blocked 30+ days.</strong> Longest: <strong>${lb[0].Key}</strong> — ${lb[0]['Epic Name']} (${lb[0]['Days in Cur Status']} days). Needs escalation.`,
+    rows: lb, sigFn: r=>`<span class="badge badge-red">${r['Days in Cur Status']}d blocked</span>`,
+    label: 'Blocked 30+ days'});
 
   const na = active.filter(d => d['Last Updated'] !== null && d['Last Updated'] >= 30)
     .sort((a,b)=>(b['Last Updated']||0)-(a['Last Updated']||0));
-  if (na.length) ins.push({t:'red', m:`<strong>${na.length} active epic${na.length>1?'s':''} with no activity in 30+ days.</strong> Longest: <strong>${na[0].Key}</strong> (${na[0]['Last Updated']} days). May be stale or abandoned.`});
+  if (na.length) ins.push({t:'red',
+    m:`<strong>${na.length} active epic${na.length>1?'s':''} with no activity in 30+ days.</strong> Longest: <strong>${na[0].Key}</strong> (${na[0]['Last Updated']} days). May be stale or abandoned.`,
+    rows: na, sigFn: r=>`<span class="badge badge-red">${r['Last Updated']}d inactive</span>`,
+    label: 'No activity 30+ days'});
 
-  const ov = active.filter(d => { if (!d['Target Date'] || d['Target Date']==='—') return false; const t = new Date(d['Target Date']); return !isNaN(t) && t < today; });
-  if (ov.length) ins.push({t:'amber', m:`<strong>${ov.length} active epic${ov.length>1?'s are':' is'} past their target date.</strong> Review whether these need re-forecasting or escalation.`});
+  const ov = active.filter(d => { if (!d['Target Date'] || d['Target Date']==='—') return false; const t = new Date(d['Target Date']); return !isNaN(t) && t < today; })
+    .map(d => { const days=Math.floor((today-new Date(d['Target Date']))/86400000); return {...d, _overdue:days}; })
+    .sort((a,b)=>b._overdue-a._overdue);
+  if (ov.length) ins.push({t:'amber',
+    m:`<strong>${ov.length} active epic${ov.length>1?'s are':' is'} past their target date.</strong> Review whether these need re-forecasting or escalation.`,
+    rows: ov, sigFn: r=>`<span class="badge badge-red">${r._overdue}d overdue</span>`,
+    label: 'Past target date'});
 
-  const sd = active.filter(d => { if (!d['Target Date'] || d['Target Date']==='—') return false; const t = new Date(d['Target Date']); if (isNaN(t) || t < today) return false; return Math.floor((t-today)/86400000) <= 14 && (d['Pct Done']||0) < 80; });
-  if (sd.length) ins.push({t:'amber', m:`<strong>${sd.length} epic${sd.length>1?'s':''} due in 14 days or less and below 80% complete.</strong> Immediate deadline risk.`});
+  const sd = active.filter(d => { if (!d['Target Date'] || d['Target Date']==='—') return false; const t = new Date(d['Target Date']); if (isNaN(t) || t < today) return false; return Math.floor((t-today)/86400000) <= 14 && (d['Pct Done']||0) < 80; })
+    .map(d => { const days=Math.floor((new Date(d['Target Date'])-today)/86400000); return {...d, _daysLeft:days}; })
+    .sort((a,b)=>a._daysLeft-b._daysLeft);
+  if (sd.length) ins.push({t:'amber',
+    m:`<strong>${sd.length} epic${sd.length>1?'s':''} due in 14 days or less and below 80% complete.</strong> Immediate deadline risk.`,
+    rows: sd, sigFn: r=>`<span class="badge badge-amber">${r._daysLeft}d left · ${Math.round(r['Pct Done']||0)}% done</span>`,
+    label: 'Deadline risk (<14 days)'});
 
   const ns = active.filter(d => !(d['Active Sprint']||'').includes('Active'));
-  if (ns.length) ins.push({t:'amber', m:`<strong>${ns.length} active epics (${Math.round(ns.length/active.length*100)}%) have no child issues in any active sprint.</strong> May not be staffed this cycle.`});
+  if (ns.length) ins.push({t:'amber',
+    m:`<strong>${ns.length} active epics (${Math.round(ns.length/active.length*100)}%) have no child issues in any active sprint.</strong> May not be staffed this cycle.`,
+    rows: ns.sort((a,b)=>(b['Pct Done']||0)-(a['Pct Done']||0)), sigFn: r=>`<span class="badge badge-gray">no sprint</span>`,
+    label: 'Active but not in sprint'});
 
-  const ad = DATA.filter(d => (d['Pct Done']||0) >= 80 && d.Status !== 'Done');
-  if (ad.length) ins.push({t:'green', m:`<strong>${ad.length} epic${ad.length>1?'s are':' is'} 80%+ complete</strong> but not marked Done. Quick wins — closing these improves portfolio metrics.`});
+  const ad = DATA.filter(d => (d['Pct Done']||0) >= 80 && d.Status !== 'Done')
+    .sort((a,b)=>(b['Pct Done']||0)-(a['Pct Done']||0));
+  if (ad.length) ins.push({t:'green',
+    m:`<strong>${ad.length} epic${ad.length>1?'s are':' is'} 80%+ complete</strong> but not marked Done. Quick wins — closing these improves portfolio metrics.`,
+    rows: ad, sigFn: r=>`<span class="badge badge-green">${Math.round(r['Pct Done']||0)}% done</span>`,
+    label: '80%+ complete, not Done'});
 
   const tc = {}; active.forEach(d => (d['Contributing Teams']||'').split(';').map(t=>t.trim()).filter(Boolean).forEach(t => { tc[t]=(tc[t]||0)+1; }));
   const bt = Object.entries(tc).sort((a,b)=>b[1]-a[1])[0];
-  if (bt) ins.push({t:'blue', m:`<strong>${bt[0]}</strong> is the most loaded team with <strong>${bt[1]} active epics</strong> across the portfolio.`});
+  if (bt) ins.push({t:'blue',
+    m:`<strong>${bt[0]}</strong> is the most loaded team with <strong>${bt[1]} active epics</strong> across the portfolio.`,
+    rows: active.filter(d=>(d['Contributing Teams']||'').includes(bt[0])).sort((a,b)=>(b['Pct Done']||0)-(a['Pct Done']||0)),
+    sigFn: r=>`<span class="badge badge-gray">${r.Status}</span>`,
+    label: `Most loaded: ${bt[0]}`});
 
-  if (!ins.length) ins.push({t:'green', m:'Portfolio looks healthy — no critical signals detected.'});
-  document.getElementById('insights-container').innerHTML = ins.map(i => `<div class="insight ${i.t}">${i.m}</div>`).join('');
+  if (!ins.length) { document.getElementById('insights-container').innerHTML='<div class="insight green">Portfolio looks healthy — no critical signals detected.</div>'; return; }
+
+  // Store for click handler
+  window._insightData = ins;
+
+  document.getElementById('insights-container').innerHTML = ins.map((i,idx) =>
+    `<div class="insight ${i.t} insight-clickable" onclick="insightClick(${idx})" title="Click to see ${i.rows?.length||0} epics">
+      ${i.m}
+      <span class="insight-cta">Ver ${i.rows?.length||0} epics →</span>
+    </div>`
+  ).join('');
+}
+
+function insightClick(idx) {
+  const ins = window._insightData[idx];
+  if (!ins || !ins.rows) return;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.metric-card').forEach(c=>c.classList.remove('metric-active'));
+  document.querySelectorAll('.insight').forEach(i=>i.classList.remove('insight-active'));
+  document.querySelectorAll('.insight')[idx].classList.add('insight-active');
+  showTableFromChart(ins.label, ins.rows, ins.sigFn);
 }
 
 function shortTeam(t) {
