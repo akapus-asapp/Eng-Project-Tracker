@@ -61,6 +61,12 @@
   .divider { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 1px; margin: 20px 0 12px; }
   .empty { padding: 24px; text-align: center; color: #888; font-size: 13px; }
   .data-badge { background: #E8F4FD; color: #185FA5; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .person-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; cursor: pointer; padding: 4px 6px; border-radius: 6px; transition: background .12s; }
+  .person-row:hover { background: #F0F7FF; }
+  .person-name { width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; color: #344054; font-weight: 500; }
+  .person-track { flex: 1; height: 14px; border-radius: 4px; background: #F0F4F8; overflow: hidden; }
+  .person-fill { height: 100%; border-radius: 4px; overflow: hidden; display: flex; }
+  .person-count { width: 24px; text-align: right; color: #888; flex-shrink: 0; font-size: 11px; }
   @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -111,6 +117,17 @@
       <div class="chart-wrap" style="height:200px">
         <canvas id="exec-chart"></canvas>
       </div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-title">By PM <span style="font-size:10px;color:#aaa;font-weight:400">· tap a name to ver sus epics</span></div>
+      <div id="pm-chart" style="max-height:280px;overflow-y:auto"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">By Eng Lead <span style="font-size:10px;color:#aaa;font-weight:400">· tap a name to ver sus epics</span></div>
+      <div id="eng-chart" style="max-height:280px;overflow-y:auto"></div>
     </div>
   </div>
 
@@ -362,6 +379,52 @@ function showTable(type, btn) {
   }</tbody></table>`;
 }
 
+function renderPersonChart(containerId, field, activeStatuses) {
+  const counts = {};
+  DATA.forEach(d => {
+    if (!activeStatuses.includes(d.Status)) return;
+    const person = (d[field]||'').trim() || '(unassigned)';
+    if (!counts[person]) counts[person] = {total:0, byStatus:{}};
+    counts[person].total++;
+    counts[person].byStatus[d.Status] = (counts[person].byStatus[d.Status]||0)+1;
+  });
+
+  const sorted = Object.entries(counts).sort((a,b)=>b[1].total-a[1].total).slice(0,20);
+  const maxVal = sorted[0]?.[1].total || 1;
+
+  const statusColors = {'In Progress':'#378ADD','Blocked':'#E24B4A','Pending Prod Deploy':'#EF9F27','Pending Sync':'#FAC775','Backlog':'#B4B2A9','Unstarted':'#D3D1C7'};
+
+  document.getElementById(containerId).innerHTML = sorted.map(([name, data]) => {
+    const pct = Math.round(data.total / maxVal * 100);
+    const segments = Object.entries(data.byStatus).map(([st, n]) => {
+      const w = Math.round(n / data.total * 100);
+      const col = statusColors[st] || '#CBD5E1';
+      return `<div style="width:${w}%;background:${col};height:100%;display:inline-block" title="${st}: ${n}"></div>`;
+    }).join('');
+    return `<div class="person-row" onclick="personClick('${field}','${name.replace(/'/g,"\'")}')">
+      <span class="person-name" title="${name}">${name}</span>
+      <div class="person-track">
+        <div class="person-fill" style="width:${pct}%">${segments}</div>
+      </div>
+      <span class="person-count">${data.total}</span>
+    </div>`;
+  }).join('');
+}
+
+function personClick(field, name) {
+  const rows = DATA.filter(d => {
+    const val = (d[field]||'').trim() || '(unassigned)';
+    return val === name;
+  }).sort((a,b) => {
+    const order = ['In Progress','Blocked','Pending Prod Deploy','Unstarted','Backlog','Done','On Hold'];
+    return order.indexOf(a.Status) - order.indexOf(b.Status);
+  });
+  const label = field === 'PM' ? `PM: ${name}` : `Eng Lead: ${name}`;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.metric-card').forEach(c=>c.classList.remove('metric-active'));
+  showTableFromChart(label, rows, r=>`<span class="badge badge-gray">${r.Status}</span>`);
+}
+
 // Initialize
 renderMetrics();
 renderInsights();
@@ -369,6 +432,9 @@ renderTeamRisk();
 renderStatusChart();
 renderPctChart();
 renderExecChart();
+const activeForPeople = ['In Progress','Blocked','Pending Prod Deploy','Pending Sync','Unstarted','Backlog'];
+renderPersonChart('pm-chart', 'PM', activeForPeople);
+renderPersonChart('eng-chart', 'Eng Lead', activeForPeople);
 showTable('stalled', document.querySelector('.tab.active'));
 </script>
 </body>
