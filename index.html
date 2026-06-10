@@ -14,6 +14,9 @@
   .main { padding: 24px; max-width: 1400px; margin: 0 auto; }
   .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
   .metric-card { background: #fff; border-radius: 10px; padding: 16px; border: 1px solid #E5E9F0; }
+  .metric-clickable { cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+  .metric-clickable:hover { border-color: #185FA5; box-shadow: 0 0 0 3px rgba(24,95,165,.08); }
+  .metric-active { border-color: #185FA5 !important; box-shadow: 0 0 0 3px rgba(24,95,165,.12) !important; background: #F0F7FF !important; }
   .metric-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
   .metric-value { font-size: 28px; font-weight: 600; }
   .metric-note { font-size: 11px; color: #888; margin-top: 4px; }
@@ -143,15 +146,42 @@ function renderMetrics() {
   const done = DATA.filter(d => d.Status === 'Done');
   const pctVals = DATA.map(d => d['Pct Done']).filter(v => v !== null);
   const avgPct = pctVals.length ? Math.round(pctVals.reduce((a,b)=>a+b,0)/pctVals.length) : 0;
-  document.getElementById('metrics-grid').innerHTML = [
-    {l:'Total epics',  v: DATA.length,       c:'blue',  n:'across all statuses'},
-    {l:'Active',       v: active.length,      c:'blue',  n:'In Progress + Blocked'},
-    {l:'Blocked',      v: blocked.length,     c:'red',   n: Math.round(blocked.length/DATA.length*100)+'% of portfolio'},
-    {l:'High risk',    v: highRisk.length,    c:'red',   n:'manually flagged'},
-    {l:'In sprint',    v: inSprint.length,    c:'green', n:'with active child issues'},
-    {l:'Avg progress', v: avgPct+'%',         c:'',      n:'across all epics'},
-    {l:'Done',         v: done.length,        c:'green', n:'completed epics'},
-  ].map(m => `<div class="metric-card"><div class="metric-label">${m.l}</div><div class="metric-value ${m.c}">${m.v}</div><div class="metric-note">${m.n}</div></div>`).join('');
+
+  const metrics = [
+    {l:'Total epics',  v: DATA.length,       c:'blue',  n:'across all statuses',
+     rows: DATA, sigFn: r=>`<span class="badge badge-gray">${r.Status}</span>`},
+    {l:'Active',       v: active.length,      c:'blue',  n:'In Progress + Blocked',
+     rows: active.sort((a,b)=>(b['Pct Done']||0)-(a['Pct Done']||0)), sigFn: r=>`<span class="badge badge-gray">${r.Status}</span>`},
+    {l:'Blocked',      v: blocked.length,     c:'red',   n: Math.round(blocked.length/DATA.length*100)+'% of portfolio',
+     rows: blocked.sort((a,b)=>(b['Days in Cur Status']||0)-(a['Days in Cur Status']||0)), sigFn: r=>`<span class="badge badge-red">${r['Days in Cur Status']||'—'}d blocked</span>`},
+    {l:'High risk',    v: highRisk.length,    c:'red',   n:'manually flagged',
+     rows: highRisk, sigFn: r=>`<span class="badge badge-red">🔴 High risk</span>`},
+    {l:'In sprint',    v: inSprint.length,    c:'green', n:'with active child issues',
+     rows: inSprint.sort((a,b)=>(b['Pct Done']||0)-(a['Pct Done']||0)), sigFn: r=>`<span class="badge badge-green">${Math.round(r['Pct Done']||0)}% done</span>`},
+    {l:'Avg progress', v: avgPct+'%',         c:'',      n:'across all epics',
+     rows: DATA.filter(d=>d['Pct Done']!==null).sort((a,b)=>b['Pct Done']-a['Pct Done']), sigFn: r=>`<span class="badge badge-gray">${Math.round(r['Pct Done']||0)}% done</span>`},
+    {l:'Done',         v: done.length,        c:'green', n:'completed epics',
+     rows: done, sigFn: r=>`<span class="badge badge-green">✓ Done</span>`},
+  ];
+
+  document.getElementById('metrics-grid').innerHTML = metrics.map((m,i) =>
+    `<div class="metric-card metric-clickable" onclick="metricClick(${i})" title="Click to see epics">
+      <div class="metric-label">${m.l}</div>
+      <div class="metric-value ${m.c}">${m.v}</div>
+      <div class="metric-note">${m.n}</div>
+    </div>`
+  ).join('');
+
+  // Store for click handler
+  window._metricData = metrics;
+}
+
+function metricClick(i) {
+  const m = window._metricData[i];
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.metric-card').forEach(c=>c.classList.remove('metric-active'));
+  document.querySelectorAll('.metric-card')[i].classList.add('metric-active');
+  showTableFromChart(m.l, m.rows, m.sigFn);
 }
 
 function renderInsights() {
