@@ -34,7 +34,8 @@
   .epic-table td { padding: 8px; border-bottom: 1px solid #F0F4F8; vertical-align: middle; }
   .epic-table tr:last-child td { border-bottom: none; }
   .epic-table tr:hover td { background: #F9FAFB; }
-  .epic-key { color: #185FA5; font-weight: 600; white-space: nowrap; }
+  .epic-key { color: #185FA5; font-weight: 600; white-space: nowrap; text-decoration: none; }
+  .epic-key:hover { text-decoration: underline; }
   .epic-name { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
   .progress-bar { height: 6px; background: #E5E9F0; border-radius: 3px; overflow: hidden; width: 80px; }
   .progress-fill { height: 100%; border-radius: 3px; }
@@ -224,7 +225,7 @@ function showTableFromChart(title, rows, sigFn) {
       const pct = r['Pct Done']||0;
       const pc = pct>=75?'#639922':pct>=40?'#378ADD':'#E24B4A';
       const team = shortTeam((r['Contributing Teams']||'—').split(';')[0].trim());
-      return `<tr><td><span class="epic-key">${r.Key}</span></td><td><span class="epic-name" title="${r['Epic Name']||''}">${r['Epic Name']||'—'}</span></td><td><span class="badge badge-gray">${r.Status}</span></td><td style="font-size:11px;color:#666">${team}</td><td><div style="font-size:11px;color:#888;margin-bottom:3px">${pct}%</div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${pc}"></div></div></td><td>${r._sig||''}</td></tr>`;
+      return `<tr><td><a class="epic-key" href="https://asapp.atlassian.net/browse/${r.Key}" target="_blank" rel="noopener" title="Open in Jira">${r.Key}</a></td><td><span class="epic-name" title="${r['Epic Name']||''}">${r['Epic Name']||'—'}</span></td><td><span class="badge badge-gray">${r.Status}</span></td><td style="font-size:11px;color:#666">${team}</td><td><div style="font-size:11px;color:#888;margin-bottom:3px">${pct}%</div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${pc}"></div></div></td><td>${r._sig||''}</td></tr>`;
     }).join('')
   }</tbody></table>`;
   scrollToTable();
@@ -326,7 +327,7 @@ function showTable(type, btn) {
       const pct = r['Pct Done']||0;
       const pc = pct>=75?'#639922':pct>=40?'#378ADD':'#E24B4A';
       const team = shortTeam((r['Contributing Teams']||'—').split(';')[0].trim());
-      return `<tr><td><span class="epic-key">${r.Key}</span></td><td><span class="epic-name" title="${r['Epic Name']||''}">${r['Epic Name']||'—'}</span></td><td><span class="badge badge-gray">${r.Status}</span></td><td style="font-size:11px;color:#666">${team}</td><td><div style="font-size:11px;color:#888;margin-bottom:3px">${pct}%</div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${pc}"></div></div></td><td>${r._sig||''}</td></tr>`;
+      return `<tr><td><a class="epic-key" href="https://asapp.atlassian.net/browse/${r.Key}" target="_blank" rel="noopener" title="Open in Jira">${r.Key}</a></td><td><span class="epic-name" title="${r['Epic Name']||''}">${r['Epic Name']||'—'}</span></td><td><span class="badge badge-gray">${r.Status}</span></td><td style="font-size:11px;color:#666">${team}</td><td><div style="font-size:11px;color:#888;margin-bottom:3px">${pct}%</div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${pc}"></div></div></td><td>${r._sig||''}</td></tr>`;
     }).join('')
   }</tbody></table>`;
 }
