@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASAPP Engineering Portfolio Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F5F7FA; color: #1A1A2E; font-size: 14px; line-height: 1.5; }
+  .header { background: #fff; border-bottom: 1px solid #E5E9F0; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header p { font-size: 12px; color: #888; margin-top: 2px; }
+  .btn { padding: 7px 14px; border-radius: 6px; border: 1px solid #D0D5DD; background: #fff; cursor: pointer; font-size: 13px; color: #344054; font-weight: 500; }
+  .btn:hover { background: #F9FAFB; }
+  .btn-primary { background: #185FA5; color: #fff; border-color: #185FA5; }
+  .btn-primary:hover { background: #0C447C; }
+  .main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+  .loader { background: #fff; border-radius: 12px; padding: 48px; text-align: center; border: 1px solid #E5E9F0; }
+  .loader h2 { font-size: 16px; font-weight: 600; margin-bottom: 8px; color: #1A1A2E; }
+  .loader p { font-size: 13px; color: #666; margin-bottom: 24px; }
+  .spinner { width: 36px; height: 36px; border: 3px solid #E5E9F0; border-top-color: #185FA5; border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-box { background: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px; padding: 20px 24px; color: #C0392B; font-size: 13px; line-height: 1.7; }
+  .error-box strong { display: block; margin-bottom: 6px; font-size: 14px; }
+  .error-box a { color: #185FA5; }
+  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .metric-card { background: #fff; border-radius: 10px; padding: 16px; border: 1px solid #E5E9F0; }
+  .metric-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .metric-value { font-size: 28px; font-weight: 600; }
+  .metric-note { font-size: 11px; color: #888; margin-top: 4px; }
+  .red { color: #C0392B; } .amber { color: #854F0B; } .green { color: #1E8449; } .blue { color: #185FA5; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .card { background: #fff; border-radius: 10px; padding: 20px; border: 1px solid #E5E9F0; }
+  .card-title { font-size: 14px; font-weight: 600; color: #1A1A2E; margin-bottom: 14px; }
+  .insight { padding: 10px 14px; border-radius: 6px; margin-bottom: 8px; font-size: 13px; line-height: 1.6; border-left: 3px solid; }
+  .insight.red { background: #FEF2F2; border-color: #E24B4A; }
+  .insight.amber { background: #FFFBEB; border-color: #EF9F27; }
+  .insight.green { background: #F0FDF4; border-color: #639922; }
+  .insight.blue { background: #EFF6FF; border-color: #378ADD; }
+  .tab-bar { display: flex; gap: 4px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tab { padding: 5px 12px; border-radius: 100px; border: 1px solid #D0D5DD; background: #fff; cursor: pointer; font-size: 12px; color: #666; font-weight: 500; }
+  .tab.active { background: #185FA5; color: #fff; border-color: #185FA5; }
+  .epic-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .epic-table th { padding: 6px 8px; text-align: left; border-bottom: 1px solid #E5E9F0; color: #888; font-weight: 500; font-size: 11px; text-transform: uppercase; }
+  .epic-table td { padding: 8px; border-bottom: 1px solid #F0F4F8; vertical-align: middle; }
+  .epic-table tr:last-child td { border-bottom: none; }
+  .epic-table tr:hover td { background: #F9FAFB; }
+  .epic-key { color: #185FA5; font-weight: 600; white-space: nowrap; }
+  .epic-name { max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  .progress-bar { height: 6px; background: #E5E9F0; border-radius: 3px; overflow: hidden; width: 80px; }
+  .progress-fill { height: 100%; border-radius: 3px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 100px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .badge-red { background: #FEF2F2; color: #C0392B; }
+  .badge-amber { background: #FFFBEB; color: #854F0B; }
+  .badge-green { background: #F0FDF4; color: #1E8449; }
+  .badge-gray { background: #F5F7FA; color: #666; }
+  .risk-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; font-size: 12px; }
+  .risk-label { width: 120px; color: #444; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+  .risk-track { flex: 1; height: 8px; border-radius: 4px; background: #F0F4F8; overflow: hidden; display: flex; }
+  .risk-r { background: #E24B4A; height: 100%; }
+  .risk-a { background: #EF9F27; height: 100%; }
+  .risk-g { background: #639922; height: 100%; }
+  .risk-count { width: 20px; text-align: right; color: #888; flex-shrink: 0; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; font-size: 12px; color: #666; }
+  .legend span { display: flex; align-items: center; gap: 4px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .chart-wrap { position: relative; }
+  .divider { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 1px; margin: 20px 0 12px; }
+  .empty { padding: 24px; text-align: center; color: #888; font-size: 13px; }
+  #dashboard { display: none; }
+  .refresh-bar { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #888; }
+  @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>ASAPP Engineering Portfolio</h1>
+    <p id="header-sub">Loading data from Google Sheets…</p>
+  </div>
+  <div class="refresh-bar">
+    <span id="last-loaded"></span>
+    <button class="btn btn-primary" onclick="fetchSheet()" id="refresh-btn">↻ Refresh</button>
+  </div>
+</div>
+
+<div class="main">
+  <div id="loader" class="loader">
+    <div class="spinner"></div>
+    <h2>Connecting to Google Sheets…</h2>
+    <p>Fetching the Stakeholder View tab directly from your spreadsheet.</p>
+  </div>
+  <div id="error-area" style="display:none"></div>
+
+  <div id="dashboard">
+    <div class="metrics-grid" id="metrics-grid"></div>
+
+    <div class="divider">Key insights</div>
+    <div class="card" style="margin-bottom:16px"><div id="insights-container"></div></div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Risk by team</div>
+        <div class="legend">
+          <span><span class="legend-dot" style="background:#E24B4A"></span>High</span>
+          <span><span class="legend-dot" style="background:#EF9F27"></span>Medium</span>
+          <span><span class="legend-dot" style="background:#639922"></span>Low</span>
+        </div>
+        <div id="team-risk-chart"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Status breakdown</div>
+        <div class="chart-wrap" style="height:220px">
+          <canvas id="status-chart"></canvas>
+        </div>
+        <div id="status-legend" class="legend" style="margin-top:10px;margin-bottom:0"></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Progress distribution</div>
+        <div class="chart-wrap" style="height:200px">
+          <canvas id="pct-chart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Execution age distribution</div>
+        <div class="chart-wrap" style="height:200px">
+          <canvas id="exec-chart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider">Epics needing attention</div>
+    <div class="card">
+      <div class="tab-bar">
+        <button class="tab active" onclick="showTable('stalled',this)">Stalled (no progress)</button>
+        <button class="tab" onclick="showTable('blocked',this)">Blocked longest</button>
+        <button class="tab" onclick="showTable('overdue',this)">Past deadline</button>
+        <button class="tab" onclick="showTable('inactive',this)">No activity 30d+</button>
+        <button class="tab" onclick="showTable('almost',this)">Almost done (80%+)</button>
+      </div>
+      <div id="table-container"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+const SHEET_ID  = '1EjG3Jb96kQ6m75bw6DJNo_j86-M8SESOJI90s05Hawc';
+const SHEET_GID = '38005099'; // Stakeholder View tab
+// ─────────────────────────────────────────────────────────────────────────────
+
+let DATA = [], statusChart = null, pctChart = null, execChart = null;
+
+async function fetchSheet() {
+  document.getElementById('loader').style.display = 'block';
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('error-area').style.display = 'none';
+  document.getElementById('refresh-btn').disabled = true;
+  document.getElementById('header-sub').textContent = 'Fetching latest data…';
+
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status} — ${res.statusText}`);
+    const text = await res.text();
+    DATA = parseCSV(text);
+    if (!DATA.length) throw new Error('Parsed 0 rows. Make sure the sheet is shared publicly ("Anyone with the link can view").');
+
+    document.getElementById('loader').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    const now = new Date().toLocaleString('en-US', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+    document.getElementById('header-sub').textContent = `${DATA.length} epics · last refreshed ${now}`;
+    document.getElementById('last-loaded').textContent = '';
+
+    renderMetrics();
+    renderInsights();
+    renderTeamRisk();
+    renderStatusChart();
+    renderPctChart();
+    renderExecChart();
+    showTable('stalled', document.querySelector('.tab.active'));
+
+  } catch (err) {
+    document.getElementById('loader').style.display = 'none';
+    document.getElementById('error-area').style.display = 'block';
+    document.getElementById('error-area').innerHTML = `
+      <div class="error-box">
+        <strong>⚠️ Could not load spreadsheet data</strong>
+        ${err.message}<br><br>
+        Make sure the Google Sheet is set to <strong>"Anyone with the link → Viewer"</strong>:<br>
+        Share → Change access → Anyone with the link → Viewer → Done.<br><br>
+        <a href="https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit" target="_blank">Open spreadsheet →</a>
+        &nbsp;&nbsp;
+        <button class="btn btn-primary" onclick="fetchSheet()" style="margin-top:8px">Try again</button>
+      </div>`;
+    document.getElementById('header-sub').textContent = 'Failed to load — check sharing settings';
+  } finally {
+    document.getElementById('refresh-btn').disabled = false;
+  }
+}
+
+function parseRow(line) {
+  const res = []; let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { res.push(cur); cur = ''; }
+    else { cur += c; }
+  }
+  res.push(cur); return res;
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n').filter(l => l.trim());
+  let hi = -1;
+  for (let i = 0; i < Math.min(12, lines.length); i++) {
+    const r = parseRow(lines[i]);
+    if (r.some(c => c.trim() === 'Key') && r.some(c => c.trim() === 'Status')) { hi = i; break; }
+  }
+  if (hi === -1) return [];
+  const headers = parseRow(lines[hi]).map(h => h.trim());
+  const rows = [];
+  for (let i = hi + 1; i < lines.length; i++) {
+    const vals = parseRow(lines[i]);
+    if (!vals[0] || !vals[0].trim()) continue;
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h] = (vals[idx] || '').trim().replace(/^"|"$/g, ''); });
+    if (obj['Key'] && /^[A-Z]+-\d+$/.test(obj['Key'])) rows.push(obj);
+  }
+  return rows;
+}
+
+function toNum(v) {
+  if (!v || v === '—' || v === '') return null;
+  const n = parseFloat(String(v).replace('%', '').replace(/[^\d.-]/g, ''));
+  return isNaN(n) ? null : n;
+}
+
+function renderMetrics() {
+  const active = DATA.filter(d => ['In Progress','Blocked','Pending Prod Deploy','Pending Sync'].includes(d.Status));
+  const blocked = DATA.filter(d => d.Status === 'Blocked');
+  const highRisk = DATA.filter(d => (d.Risk||'').includes('High'));
+  const inSprint = DATA.filter(d => (d['Active Sprint']||'').includes('Active'));
+  const done = DATA.filter(d => d.Status === 'Done');
+  const pctVals = DATA.map(d => toNum(d['% Done'])).filter(v => v !== null);
+  const avgPct = pctVals.length ? Math.round(pctVals.reduce((a,b)=>a+b,0)/pctVals.length) : 0;
+  document.getElementById('metrics-grid').innerHTML = [
+    {l:'Total epics',  v: DATA.length,       c:'blue',  n:'across all statuses'},
+    {l:'Active',       v: active.length,      c:'blue',  n:'In Progress + Blocked'},
+    {l:'Blocked',      v: blocked.length,     c:'red',   n: Math.round(blocked.length/DATA.length*100)+'% of portfolio'},
+    {l:'High risk',    v: highRisk.length,    c:'red',   n:'manually flagged'},
+    {l:'In sprint',    v: inSprint.length,    c:'green', n:'with active child issues'},
+    {l:'Avg progress', v: avgPct+'%',         c:'',      n:'across all epics'},
+    {l:'Done',         v: done.length,        c:'green', n:'completed epics'},
+  ].map(m => `<div class="metric-card"><div class="metric-label">${m.l}</div><div class="metric-value ${m.c}">${m.v}</div><div class="metric-note">${m.n}</div></div>`).join('');
+}
+
+function renderInsights() {
+  const today = new Date();
+  const active = DATA.filter(d => ['In Progress','Blocked','Pending Prod Deploy','Pending Sync'].includes(d.Status));
+  const ins = [];
+
+  const lb = DATA.filter(d => d.Status === 'Blocked' && toNum(d['Days in Cur Status']) >= 30)
+    .sort((a,b)=>(toNum(b['Days in Cur Status'])||0)-(toNum(a['Days in Cur Status'])||0));
+  if (lb.length) ins.push({t:'red', m:`<strong>${lb.length} epic${lb.length>1?'s have':' has'} been Blocked 30+ days.</strong> Longest: <strong>${lb[0].Key}</strong> — ${lb[0]['Epic Name']} (${toNum(lb[0]['Days in Cur Status'])} days). Needs escalation.`});
+
+  const na = active.filter(d => toNum(d['Last Updated (days)']) >= 30)
+    .sort((a,b)=>(toNum(b['Last Updated (days)'])||0)-(toNum(a['Last Updated (days)'])||0));
+  if (na.length) ins.push({t:'red', m:`<strong>${na.length} active epic${na.length>1?'s':''} with no activity in 30+ days.</strong> Longest: <strong>${na[0].Key}</strong> (${toNum(na[0]['Last Updated (days)'])} days). May be stale or abandoned.`});
+
+  const ov = active.filter(d => { const t = new Date(d['Target Date']); return !isNaN(t) && t < today; });
+  if (ov.length) ins.push({t:'amber', m:`<strong>${ov.length} active epic${ov.length>1?'s are':' is'} past their target date.</strong> Review whether these need re-forecasting or escalation.`});
+
+  const sd = active.filter(d => { const t = new Date(d['Target Date']); if (isNaN(t) || t < today) return false; return Math.floor((t-today)/86400000) <= 14 && (toNum(d['% Done'])||0) < 80; });
+  if (sd.length) ins.push({t:'amber', m:`<strong>${sd.length} epic${sd.length>1?'s':''} due in 14 days or less and below 80% complete.</strong> Immediate deadline risk.`});
+
+  const ns = active.filter(d => !(d['Active Sprint']||'').includes('Active'));
+  if (ns.length) ins.push({t:'amber', m:`<strong>${ns.length} active epics (${Math.round(ns.length/active.length*100)}%) have no child issues in any active sprint.</strong> May not be staffed this cycle.`});
+
+  const ad = DATA.filter(d => toNum(d['% Done']) >= 80 && d.Status !== 'Done');
+  if (ad.length) ins.push({t:'green', m:`<strong>${ad.length} epic${ad.length>1?'s are':' is'} 80%+ complete</strong> but not marked Done. Quick wins — closing these improves portfolio metrics.`});
+
+  const tc = {}; active.forEach(d => (d['Contributing Teams']||'').split(';').map(t=>t.trim()).filter(Boolean).forEach(t => { tc[t]=(tc[t]||0)+1; }));
+  const bt = Object.entries(tc).sort((a,b)=>b[1]-a[1])[0];
+  if (bt) ins.push({t:'blue', m:`<strong>${bt[0]}</strong> is the most loaded team with <strong>${bt[1]} active epics</strong> across the portfolio.`});
+
+  if (!ins.length) ins.push({t:'green', m:'Portfolio looks healthy — no critical signals detected.'});
+  document.getElementById('insights-container').innerHTML = ins.map(i => `<div class="insight ${i.t}">${i.m}</div>`).join('');
+}
+
+function shortTeam(t) {
+  return t.replace('GenAgent ','GA ').replace('Developer Suite','Dev Suite').replace('Augmented Customer Experience','ACE')
+    .replace('Voice Infrastructure','V-Infra').replace('Voice ML','VML').replace('Infrastructure','Infra')
+    .replace('Knowledge Base','KB').replace('Messaging Platform','MP').replace('Conversation Explorer','CE')
+    .replace('Integrations','Intg').replace('AI Services','AIS').replace('Platform','PLT');
+}
+
+function renderTeamRisk() {
+  const tr = {};
+  DATA.forEach(d => {
+    if (!['In Progress','Blocked','Pending Prod Deploy','Pending Sync'].includes(d.Status)) return;
+    const risk = (d.Risk||'').includes('High') ? 'r' : (d.Risk||'').includes('Medium') ? 'a' : 'g';
+    (d['Contributing Teams']||'').split(';').map(t=>t.trim()).filter(Boolean).forEach(t => { if (!tr[t]) tr[t]={r:0,a:0,g:0}; tr[t][risk]++; });
+  });
+  const sorted = Object.entries(tr).sort((a,b)=>(b[1].r-a[1].r)||((b[1].r+b[1].a+b[1].g)-(a[1].r+a[1].a+a[1].g)));
+  document.getElementById('team-risk-chart').innerHTML = sorted.map(([team,c]) => {
+    const total = c.r+c.a+c.g;
+    const rP = Math.round(c.r/total*100), aP = Math.round(c.a/total*100), gP = 100-rP-aP;
+    return `<div class="risk-row"><span class="risk-label" title="${team}">${shortTeam(team)}</span><div class="risk-track"><div class="risk-r" style="width:${rP}%"></div><div class="risk-a" style="width:${aP}%"></div><div class="risk-g" style="width:${gP}%"></div></div><span class="risk-count">${total}</span></div>`;
+  }).join('');
+}
+
+function renderStatusChart() {
+  const counts = {};
+  DATA.forEach(d => { counts[d.Status]=(counts[d.Status]||0)+1; });
+  const labels = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
+  const data = labels.map(l=>counts[l]);
+  const cm = {'In Progress':'#378ADD','Blocked':'#E24B4A','Done':'#639922','Backlog':'#B4B2A9','Unstarted':'#D3D1C7','Pending Prod Deploy':'#EF9F27','Pending Sync':'#FAC775','On Hold':'#888780','Selected for Development':'#85B7EB','Full Review':'#5DCAA5'};
+  const colors = labels.map(l=>cm[l]||'#CBD5E1');
+  if (statusChart) statusChart.destroy();
+  statusChart = new Chart(document.getElementById('status-chart'), {
+    type:'doughnut', data:{labels, datasets:[{data, backgroundColor:colors, borderWidth:2, borderColor:'#fff'}]},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw} (${Math.round(ctx.raw/DATA.length*100)}%)`}}}}
+  });
+  document.getElementById('status-legend').innerHTML = labels.slice(0,7).map((l,i)=>`<span><span class="legend-dot" style="background:${colors[i]}"></span>${l} <strong>${counts[l]}</strong></span>`).join('');
+}
+
+function renderPctChart() {
+  const b = {'0%':0,'1-25%':0,'26-50%':0,'51-75%':0,'76-99%':0,'100%':0,'N/A':0};
+  DATA.forEach(d => { const v=toNum(d['% Done']); if(v===null){b['N/A']++;return;} if(v===0)b['0%']++; else if(v<=25)b['1-25%']++; else if(v<=50)b['26-50%']++; else if(v<=75)b['51-75%']++; else if(v<100)b['76-99%']++; else b['100%']++; });
+  if (pctChart) pctChart.destroy();
+  pctChart = new Chart(document.getElementById('pct-chart'), {
+    type:'bar', data:{labels:Object.keys(b), datasets:[{data:Object.values(b), backgroundColor:['#B4B2A9','#E24B4A','#EF9F27','#FAC775','#9FE1CB','#639922','#D3D1C7'], borderRadius:4, borderWidth:0}]},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${ctx.raw} epics`}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:11}}}, y:{grid:{color:'rgba(0,0,0,0.04)'}, ticks:{font:{size:11}}, beginAtZero:true}}}
+  });
+}
+
+function renderExecChart() {
+  const b = {'No data':0,'<14d':0,'14-30d':0,'31-60d':0,'61-90d':0,'91-180d':0,'180d+':0};
+  DATA.forEach(d => { const v=toNum(d['Days in Execution']); if(v===null){b['No data']++;return;} if(v<14)b['<14d']++; else if(v<=30)b['14-30d']++; else if(v<=60)b['31-60d']++; else if(v<=90)b['61-90d']++; else if(v<=180)b['91-180d']++; else b['180d+']++; });
+  if (execChart) execChart.destroy();
+  execChart = new Chart(document.getElementById('exec-chart'), {
+    type:'bar', data:{labels:Object.keys(b), datasets:[{data:Object.values(b), backgroundColor:['#D3D1C7','#9FE1CB','#FAC775','#EF9F27','#E24B4A','#C0392B','#7D2020'], borderRadius:4, borderWidth:0}]},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${ctx.raw} epics`}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:11}}}, y:{grid:{color:'rgba(0,0,0,0.04)'}, ticks:{font:{size:11}}, beginAtZero:true}}}
+  });
+}
+
+function showTable(type, btn) {
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const today = new Date(); let rows = [];
+
+  if (type==='stalled') rows = DATA.filter(d=>['In Progress','Blocked','Pending Prod Deploy'].includes(d.Status)&&(toNum(d['% Done'])===0||toNum(d['% Done'])===null)&&toNum(d['Days in Execution'])>14).sort((a,b)=>(toNum(b['Days in Execution'])||0)-(toNum(a['Days in Execution'])||0)).slice(0,20).map(d=>({...d,_sig:`<span class="badge badge-red">${toNum(d['Days in Execution'])}d in exec</span>`}));
+  if (type==='blocked') rows = DATA.filter(d=>d.Status==='Blocked').sort((a,b)=>(toNum(b['Days in Cur Status'])||0)-(toNum(a['Days in Cur Status'])||0)).slice(0,20).map(d=>({...d,_sig:`<span class="badge badge-red">${toNum(d['Days in Cur Status'])||'—'}d blocked</span>`}));
+  if (type==='overdue') rows = DATA.filter(d=>{if(!['In Progress','Blocked','Pending Prod Deploy','Pending Sync'].includes(d.Status))return false;const t=new Date(d['Target Date']);return !isNaN(t)&&t<today;}).map(d=>{const days=Math.floor((today-new Date(d['Target Date']))/86400000);return{...d,_sig:`<span class="badge badge-red">${days}d overdue</span>`,_d:days};}).sort((a,b)=>b._d-a._d).slice(0,20);
+  if (type==='inactive') rows = DATA.filter(d=>['In Progress','Blocked','Pending Prod Deploy','Pending Sync'].includes(d.Status)&&toNum(d['Last Updated (days)'])>=30).sort((a,b)=>(toNum(b['Last Updated (days)'])||0)-(toNum(a['Last Updated (days)'])||0)).slice(0,20).map(d=>({...d,_sig:`<span class="badge badge-amber">${toNum(d['Last Updated (days)'])}d inactive</span>`}));
+  if (type==='almost') rows = DATA.filter(d=>toNum(d['% Done'])>=80&&d.Status!=='Done').sort((a,b)=>(toNum(b['% Done'])||0)-(toNum(a['% Done'])||0)).slice(0,20).map(d=>({...d,_sig:`<span class="badge badge-green">${toNum(d['% Done'])}% done</span>`}));
+
+  if (!rows.length) { document.getElementById('table-container').innerHTML='<div class="empty">No epics match this filter.</div>'; return; }
+  document.getElementById('table-container').innerHTML = `<table class="epic-table"><thead><tr><th>Key</th><th>Epic name</th><th>Status</th><th>Team</th><th style="width:90px">Progress</th><th>Signal</th></tr></thead><tbody>${
+    rows.map(r => {
+      const pct = toNum(r['% Done'])||0;
+      const pc = pct>=75?'#639922':pct>=40?'#378ADD':'#E24B4A';
+      const team = shortTeam((r['Contributing Teams']||'—').split(';')[0].trim());
+      return `<tr><td><span class="epic-key">${r.Key}</span></td><td><span class="epic-name" title="${r['Epic Name']||''}">${r['Epic Name']||'—'}</span></td><td><span class="badge badge-gray">${r.Status}</span></td><td style="font-size:11px;color:#666">${team}</td><td><div style="font-size:11px;color:#888;margin-bottom:3px">${pct}%</div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${pc}"></div></div></td><td>${r._sig||''}</td></tr>`;
+    }).join('')
+  }</tbody></table>`;
+}
+
+// Auto-load on page open
+fetchSheet();
+</script>
+</body>
+</html>
