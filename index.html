@@ -87,7 +87,7 @@
       <div id="team-risk-chart"></div>
     </div>
     <div class="card">
-      <div class="card-title">Status breakdown</div>
+      <div class="card-title">Status breakdown <span style="font-size:10px;color:#aaa;font-weight:400">· tap a segment to drill down</span></div>
       <div class="chart-wrap" style="height:220px">
         <canvas id="status-chart"></canvas>
       </div>
@@ -208,6 +208,28 @@ function renderTeamRisk() {
   }).join('');
 }
 
+function scrollToTable() {
+  document.querySelector('.card:last-child').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function showTableFromChart(title, rows, sigFn) {
+  // Deactivate tab buttons when chart drives the table
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  if (!rows.length) { document.getElementById('table-container').innerHTML=`<div class="empty">No epics in "${title}".</div>`; scrollToTable(); return; }
+  rows = rows.map(r=>({...r, _sig: sigFn(r)}));
+  document.getElementById('table-container').innerHTML =
+    `<div style="padding:8px 0 10px;font-size:12px;color:#185FA5;font-weight:600;">📊 ${title} — ${rows.length} epic${rows.length!==1?'s':''}</div>` +
+    `<table class="epic-table"><thead><tr><th>Key</th><th>Epic name</th><th>Status</th><th>Team</th><th style="width:90px">Progress</th><th>Signal</th></tr></thead><tbody>${
+    rows.map(r => {
+      const pct = r['Pct Done']||0;
+      const pc = pct>=75?'#639922':pct>=40?'#378ADD':'#E24B4A';
+      const team = shortTeam((r['Contributing Teams']||'—').split(';')[0].trim());
+      return `<tr><td><span class="epic-key">${r.Key}</span></td><td><span class="epic-name" title="${r['Epic Name']||''}">${r['Epic Name']||'—'}</span></td><td><span class="badge badge-gray">${r.Status}</span></td><td style="font-size:11px;color:#666">${team}</td><td><div style="font-size:11px;color:#888;margin-bottom:3px">${pct}%</div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${pc}"></div></div></td><td>${r._sig||''}</td></tr>`;
+    }).join('')
+  }</tbody></table>`;
+  scrollToTable();
+}
+
 function renderStatusChart() {
   const counts = {};
   DATA.forEach(d => { counts[d.Status]=(counts[d.Status]||0)+1; });
@@ -216,31 +238,75 @@ function renderStatusChart() {
   const cm = {'In Progress':'#378ADD','Blocked':'#E24B4A','Done':'#639922','Backlog':'#B4B2A9','Unstarted':'#D3D1C7','Pending Prod Deploy':'#EF9F27','Pending Sync':'#FAC775','On Hold':'#888780','Selected for Development':'#85B7EB','Full Review':'#5DCAA5'};
   const colors = labels.map(l=>cm[l]||'#CBD5E1');
   if (statusChart) statusChart.destroy();
-  statusChart = new Chart(document.getElementById('status-chart'), {
+  const canvas = document.getElementById('status-chart');
+  statusChart = new Chart(canvas, {
     type:'doughnut', data:{labels, datasets:[{data, backgroundColor:colors, borderWidth:2, borderColor:'#fff'}]},
-    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw} (${Math.round(ctx.raw/DATA.length*100)}%)`}}}}
+    options:{responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw} (${Math.round(ctx.raw/DATA.length*100)}%)`}}},
+      onClick:(evt,els)=>{
+        if(!els.length) return;
+        const label = labels[els[0].index];
+        const rows = DATA.filter(d=>d.Status===label).sort((a,b)=>(b['Pct Done']||0)-(a['Pct Done']||0));
+        showTableFromChart(`Status: ${label}`, rows, r=>`<span class="badge badge-gray">${Math.round(r['Pct Done']||0)}% done</span>`);
+      }
+    }
   });
-  document.getElementById('status-legend').innerHTML = labels.slice(0,8).map((l,i)=>`<span><span class="legend-dot" style="background:${colors[i]}"></span>${l} <strong>${counts[l]}</strong></span>`).join('');
+  canvas.style.cursor='pointer';
+  document.getElementById('status-legend').innerHTML = labels.slice(0,8).map((l,i)=>`<span style="cursor:pointer" onclick="showTableFromChart('Status: ${l}', DATA.filter(d=>d.Status==='${l}'), r=>'<span class=\'badge badge-gray\'>'+Math.round(r[\'Pct Done\']||0)+'% done</span>')"><span class="legend-dot" style="background:${colors[i]}"></span>${l} <strong>${counts[l]}</strong></span>`).join('');
 }
 
 function renderPctChart() {
-  const b = {'0%':0,'1-25%':0,'26-50%':0,'51-75%':0,'76-99%':0,'100%':0,'N/A':0};
+  const buckets = {'0%':[0,0],'1-25%':[0.01,25],'26-50%':[25.01,50],'51-75%':[50.01,75],'76-99%':[75.01,99.99],'100%':[100,100],'N/A':null};
+  const b = {}; Object.keys(buckets).forEach(k=>b[k]=0);
   DATA.forEach(d => { const v=d['Pct Done']; if(v===null){b['N/A']++;return;} if(v===0)b['0%']++; else if(v<=25)b['1-25%']++; else if(v<=50)b['26-50%']++; else if(v<=75)b['51-75%']++; else if(v<100)b['76-99%']++; else b['100%']++; });
   if (pctChart) pctChart.destroy();
-  pctChart = new Chart(document.getElementById('pct-chart'), {
+  const canvas = document.getElementById('pct-chart');
+  pctChart = new Chart(canvas, {
     type:'bar', data:{labels:Object.keys(b), datasets:[{data:Object.values(b), backgroundColor:['#B4B2A9','#E24B4A','#EF9F27','#FAC775','#9FE1CB','#639922','#D3D1C7'], borderRadius:4, borderWidth:0}]},
-    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${ctx.raw} epics`}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:11}}}, y:{grid:{color:'rgba(0,0,0,0.04)'}, ticks:{font:{size:11}}, beginAtZero:true}}}
+    options:{responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${ctx.raw} epics`}}},
+      scales:{x:{grid:{display:false}, ticks:{font:{size:11}}}, y:{grid:{color:'rgba(0,0,0,0.04)'}, ticks:{font:{size:11}}, beginAtZero:true}},
+      onClick:(evt,els)=>{
+        if(!els.length) return;
+        const label = Object.keys(b)[els[0].index];
+        const range = buckets[label];
+        let rows;
+        if (label==='N/A') rows = DATA.filter(d=>d['Pct Done']===null);
+        else if (label==='0%') rows = DATA.filter(d=>d['Pct Done']===0);
+        else if (label==='100%') rows = DATA.filter(d=>d['Pct Done']===100);
+        else rows = DATA.filter(d=>d['Pct Done']!==null&&d['Pct Done']>range[0]&&d['Pct Done']<=range[1]);
+        rows = rows.sort((a,b)=>(b['Pct Done']||0)-(a['Pct Done']||0));
+        showTableFromChart(`Progress: ${label}`, rows, r=>`<span class="badge badge-gray">${Math.round(r['Pct Done']||0)}% done</span>`);
+      }
+    }
   });
+  canvas.style.cursor='pointer';
 }
 
 function renderExecChart() {
-  const b = {'No data':0,'<14d':0,'14-30d':0,'31-60d':0,'61-90d':0,'91-180d':0,'180d+':0};
+  const buckets = {'No data':null,'<14d':[0,13],'14-30d':[14,30],'31-60d':[31,60],'61-90d':[61,90],'91-180d':[91,180],'180d+':[181,99999]};
+  const b = {}; Object.keys(buckets).forEach(k=>b[k]=0);
   DATA.forEach(d => { const v=d['Days in Execution']; if(v===null){b['No data']++;return;} if(v<14)b['<14d']++; else if(v<=30)b['14-30d']++; else if(v<=60)b['31-60d']++; else if(v<=90)b['61-90d']++; else if(v<=180)b['91-180d']++; else b['180d+']++; });
   if (execChart) execChart.destroy();
-  execChart = new Chart(document.getElementById('exec-chart'), {
+  const canvas = document.getElementById('exec-chart');
+  execChart = new Chart(canvas, {
     type:'bar', data:{labels:Object.keys(b), datasets:[{data:Object.values(b), backgroundColor:['#D3D1C7','#9FE1CB','#FAC775','#EF9F27','#E24B4A','#C0392B','#7D2020'], borderRadius:4, borderWidth:0}]},
-    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${ctx.raw} epics`}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:11}}}, y:{grid:{color:'rgba(0,0,0,0.04)'}, ticks:{font:{size:11}}, beginAtZero:true}}}
+    options:{responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${ctx.raw} epics`}}},
+      scales:{x:{grid:{display:false}, ticks:{font:{size:11}}}, y:{grid:{color:'rgba(0,0,0,0.04)'}, ticks:{font:{size:11}}, beginAtZero:true}},
+      onClick:(evt,els)=>{
+        if(!els.length) return;
+        const label = Object.keys(b)[els[0].index];
+        const range = buckets[label];
+        let rows;
+        if (!range) rows = DATA.filter(d=>d['Days in Execution']===null);
+        else rows = DATA.filter(d=>d['Days in Execution']!==null&&d['Days in Execution']>=range[0]&&d['Days in Execution']<=range[1]);
+        rows = rows.sort((a,b)=>(b['Days in Execution']||0)-(a['Days in Execution']||0));
+        showTableFromChart(`Execution age: ${label}`, rows, r=>r['Days in Execution']?`<span class="badge badge-amber">${r['Days in Execution']}d in exec</span>`:`<span class="badge badge-gray">no data</span>`);
+      }
+    }
   });
+  canvas.style.cursor='pointer';
 }
 
 function showTable(type, btn) {
