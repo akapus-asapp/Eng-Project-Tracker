@@ -151,11 +151,11 @@
 
   <div class="grid-2" style="margin-bottom:16px">
     <div class="card">
-      <div class="card-title">By PM <span style="font-size:10px;color:#aaa;font-weight:400">· tap a name to ver sus epics</span></div>
+      <div class="card-title">By PM <span style="font-size:10px;color:#aaa;font-weight:400">· tap a name to see their epics</span></div>
       <div id="pm-chart" style="max-height:280px;overflow-y:auto"></div>
     </div>
     <div class="card">
-      <div class="card-title">By Eng Lead <span style="font-size:10px;color:#aaa;font-weight:400">· tap a name to ver sus epics</span></div>
+      <div class="card-title">By Eng Lead <span style="font-size:10px;color:#aaa;font-weight:400">· tap a name to see their epics</span></div>
       <div id="eng-chart" style="max-height:280px;overflow-y:auto"></div>
     </div>
   </div>
@@ -304,7 +304,7 @@ function renderInsights() {
   document.getElementById('insights-container').innerHTML = ins.map((i,idx) =>
     `<div class="insight ${i.t} insight-clickable" onclick="insightClick(${idx})" title="Click to see ${i.rows?.length||0} epics">
       ${i.m}
-      <span class="insight-cta">Ver ${i.rows?.length||0} epics →</span>
+      <span class="insight-cta">See ${i.rows?.length||0} epics →</span>
     </div>`
   ).join('');
 }
