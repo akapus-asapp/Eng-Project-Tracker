@@ -37,7 +37,7 @@
   .tab-bar { display: flex; gap: 4px; margin-bottom: 14px; flex-wrap: wrap; }
   .tab { padding: 5px 12px; border-radius: 100px; border: 1px solid #D0D5DD; background: #fff; cursor: pointer; font-size: 12px; color: #666; font-weight: 500; }
   .tab.active { background: #185FA5; color: #fff; border-color: #185FA5; }
-  .epic-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .epic-table { width: 100%; min-width: 900px; border-collapse: collapse; font-size: 12px; }
   .epic-table th { padding: 6px 8px; text-align: left; border-bottom: 1px solid #E5E9F0; color: #888; font-weight: 500; font-size: 11px; text-transform: uppercase; }
   .epic-table td { padding: 8px; border-bottom: 1px solid #F0F4F8; vertical-align: middle; }
   .epic-table tr:last-child td { border-bottom: none; }
@@ -73,6 +73,24 @@
   .person-fill { height: 100%; border-radius: 4px; overflow: hidden; display: flex; }
   .person-count { width: 24px; text-align: right; color: #888; flex-shrink: 0; font-size: 11px; }
   @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+  .trends-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 4px; }
+  .trends-kpi { background: #F9FAFB; border-radius: 8px; padding: 14px 16px; border: 1px solid #E5E9F0; }
+  .trends-kpi-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+  .trends-kpi-value { font-size: 22px; font-weight: 700; color: #1A1A2E; }
+  .trends-kpi-note { font-size: 11px; color: #888; margin-top: 3px; }
+  .trends-kpi-delta { font-size: 12px; font-weight: 600; margin-top: 3px; }
+  .delta-up { color: #1E8449; } .delta-down { color: #C0392B; } .delta-none { color: #aaa; }
+  .trends-no-data { padding: 20px; text-align: center; color: #888; font-size: 13px; background: #F9FAFB; border-radius: 8px; border: 1px dashed #D0D5DD; }
+  .velocity-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 12px; }
+  .velocity-team { width: 140px; color: #344054; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+  .velocity-bar-wrap { flex: 1; height: 8px; background: #F0F4F8; border-radius: 4px; overflow: hidden; }
+  .velocity-bar { height: 100%; border-radius: 4px; background: #378ADD; }
+  .velocity-val { width: 50px; text-align: right; color: #888; font-size: 11px; flex-shrink: 0; }
+  .deadline-risk-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .deadline-risk-table th { padding: 6px 8px; text-align: left; border-bottom: 1px solid #E5E9F0; color: #888; font-weight: 500; font-size: 11px; text-transform: uppercase; }
+  .deadline-risk-table td { padding: 7px 8px; border-bottom: 1px solid #F0F4F8; vertical-align: middle; }
+  .deadline-risk-table tr:last-child td { border-bottom: none; }
+  .deadline-risk-table tr:hover td { background: #F9FAFB; }
 </style>
 </head>
 <body>
@@ -152,6 +170,16 @@
       <button class="tab" onclick="showTable('almost',this)">Almost done (80%+)</button>
     </div>
     <div id="table-container"></div>
+  </div>
+  <div class="divider">Trends <span style="font-size:11px;color:#aaa;font-weight:400;letter-spacing:0">— week of Jun 8, 2026</span></div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="tab-bar" id="trends-tab-bar">
+      <button class="tab active" onclick="showTrends('summary',this)">📊 Portfolio summary</button>
+      <button class="tab" onclick="showTrends('stalled',this)">🛑 Stalled epics</button>
+      <button class="tab" onclick="showTrends('velocity',this)">⚡ Team velocity</button>
+      <button class="tab" onclick="showTrends('deadline',this)">📅 Deadline risk</button>
+    </div>
+    <div id="trends-container"></div>
   </div>
 </div>
 
@@ -338,14 +366,39 @@ function showTableFromChart(title, rows, sigFn) {
   rows = rows.map(r=>({...r, _sig: sigFn(r)}));
   document.getElementById('table-container').innerHTML =
     `<div style="padding:8px 0 10px;font-size:12px;color:#185FA5;font-weight:600;">📊 ${title} — ${rows.length} epic${rows.length!==1?'s':''}</div>` +
-    `<table class="epic-table"><thead><tr><th>Key</th><th>Epic name</th><th>Status</th><th>Team</th><th style="width:90px">Progress</th><th>Signal</th></tr></thead><tbody>${
+    `<div style="overflow-x:auto"><table class="epic-table"><thead><tr><th>Key</th><th>Epic name</th><th>Status</th><th>Priority</th><th>Team</th><th>PM</th><th>Eng Lead</th><th>Target date</th><th style="width:80px">Progress</th><th>Exec days</th><th>In status</th><th>Last upd</th><th>Signal</th></tr></thead><tbody>${
     rows.map(r => {
       const pct = r['Pct Done']||0;
       const pc = pct>=75?'#639922':pct>=40?'#378ADD':'#E24B4A';
       const team = shortTeam((r['Contributing Teams']||'—').split(';')[0].trim());
-      return `<tr><td><a class="epic-key" href="https://asappinc.atlassian.net/browse/${r.Key}" target="_blank" rel="noopener" title="Open in Jira">${r.Key}</a></td><td><span class="epic-name" title="${r['Epic Name']||''}">${r['Epic Name']||'—'}</span></td><td><span class="badge badge-gray">${r.Status}</span></td><td style="font-size:11px;color:#666">${team}</td><td><div style="font-size:11px;color:#888;margin-bottom:3px">${pct}%</div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${pc}"></div></div></td><td>${r._sig||''}</td></tr>`;
+      const targetDate = (!r['Target Date'] || r['Target Date']==='—') ? '—' : r['Target Date'];
+      const daysExec = r['Days in Execution'] !== null ? r['Days in Execution']+'d' : '—';
+      const daysCur = r['Days in Cur Status'] !== null ? r['Days in Cur Status']+'d' : '—';
+      const lastUpd = r['Last Updated'] !== null ? r['Last Updated']+'d' : '—';
+      const lastUpdColor = r['Last Updated'] >= 30 ? '#C0392B' : r['Last Updated'] >= 14 ? '#E67E22' : '#666';
+      const daysExecColor = r['Days in Execution'] >= 180 ? '#C0392B' : r['Days in Execution'] >= 90 ? '#E67E22' : '#666';
+      const initiative = r['Initiative'] && r['Initiative']!=='—' ? `<span style="font-size:10px;color:#666;max-width:120px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r['Initiative']}">${r['Initiative']}</span>` : '<span style="color:#ccc;font-size:10px">—</span>';
+      const priorityColor = {'Highest':'#C0392B','High':'#E67E22','Medium':'#854F0B','Low':'#1E8449','Lowest':'#888'}[r['Priority']]||'#888';
+      return `<tr>
+        <td><a class="epic-key" href="https://asappinc.atlassian.net/browse/${r.Key}" target="_blank" rel="noopener">${r.Key}</a></td>
+        <td>
+          <span class="epic-name" title="${r['Epic Name']||''}" style="max-width:200px">${r['Epic Name']||'—'}</span>
+          ${initiative}
+        </td>
+        <td><span class="badge badge-gray">${r.Status}</span></td>
+        <td style="font-size:11px;color:${priorityColor};font-weight:600">${r['Priority']||'—'}</td>
+        <td style="font-size:11px;color:#666">${team}</td>
+        <td style="font-size:11px;color:#444">${r['PM']||'—'}</td>
+        <td style="font-size:11px;color:#444">${r['Eng Lead']||'—'}</td>
+        <td style="font-size:11px;color:#666;white-space:nowrap">${targetDate}</td>
+        <td><div style="font-size:11px;color:#888;margin-bottom:3px">${pct}%</div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${pc}"></div></div></td>
+        <td style="font-size:11px;color:${daysExecColor};font-weight:600;white-space:nowrap">${daysExec}</td>
+        <td style="font-size:11px;color:#666;white-space:nowrap">${daysCur}</td>
+        <td style="font-size:11px;color:${lastUpdColor};font-weight:600;white-space:nowrap">${lastUpd}</td>
+        <td>${r._sig||''}</td>
+      </tr>`;
     }).join('')
-  }</tbody></table>`;
+  }</tbody></table></div>`;
   scrollToTable();
 }
 
@@ -492,14 +545,39 @@ function showTable(type, btn) {
   if (type==='almost') rows = DATA.filter(d=>(d['Pct Done']||0)>=80&&d.Status!=='Done').sort((a,b)=>(b['Pct Done']||0)-(a['Pct Done']||0)).slice(0,20).map(d=>({...d,_sig:`<span class="badge badge-green">${d['Pct Done']}% done</span>`}));
 
   if (!rows.length) { document.getElementById('table-container').innerHTML='<div class="empty">No epics match this filter.</div>'; return; }
-  document.getElementById('table-container').innerHTML = `<table class="epic-table"><thead><tr><th>Key</th><th>Epic name</th><th>Status</th><th>Team</th><th style="width:90px">Progress</th><th>Signal</th></tr></thead><tbody>${
+  document.getElementById('table-container').innerHTML = `<div style="overflow-x:auto"><table class="epic-table"><thead><tr><th>Key</th><th>Epic name</th><th>Status</th><th>Priority</th><th>Team</th><th>PM</th><th>Eng Lead</th><th>Target date</th><th style="width:80px">Progress</th><th>Exec days</th><th>In status</th><th>Last upd</th><th>Signal</th></tr></thead><tbody>${
     rows.map(r => {
       const pct = r['Pct Done']||0;
       const pc = pct>=75?'#639922':pct>=40?'#378ADD':'#E24B4A';
       const team = shortTeam((r['Contributing Teams']||'—').split(';')[0].trim());
-      return `<tr><td><a class="epic-key" href="https://asappinc.atlassian.net/browse/${r.Key}" target="_blank" rel="noopener" title="Open in Jira">${r.Key}</a></td><td><span class="epic-name" title="${r['Epic Name']||''}">${r['Epic Name']||'—'}</span></td><td><span class="badge badge-gray">${r.Status}</span></td><td style="font-size:11px;color:#666">${team}</td><td><div style="font-size:11px;color:#888;margin-bottom:3px">${pct}%</div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${pc}"></div></div></td><td>${r._sig||''}</td></tr>`;
+      const targetDate = (!r['Target Date'] || r['Target Date']==='—') ? '—' : r['Target Date'];
+      const daysExec = r['Days in Execution'] !== null ? r['Days in Execution']+'d' : '—';
+      const daysCur = r['Days in Cur Status'] !== null ? r['Days in Cur Status']+'d' : '—';
+      const lastUpd = r['Last Updated'] !== null ? r['Last Updated']+'d' : '—';
+      const lastUpdColor = r['Last Updated'] >= 30 ? '#C0392B' : r['Last Updated'] >= 14 ? '#E67E22' : '#666';
+      const daysExecColor = r['Days in Execution'] >= 180 ? '#C0392B' : r['Days in Execution'] >= 90 ? '#E67E22' : '#666';
+      const initiative = r['Initiative'] && r['Initiative']!=='—' ? `<span style="font-size:10px;color:#666;max-width:120px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r['Initiative']}">${r['Initiative']}</span>` : '<span style="color:#ccc;font-size:10px">—</span>';
+      const priorityColor = {'Highest':'#C0392B','High':'#E67E22','Medium':'#854F0B','Low':'#1E8449','Lowest':'#888'}[r['Priority']]||'#888';
+      return `<tr>
+        <td><a class="epic-key" href="https://asappinc.atlassian.net/browse/${r.Key}" target="_blank" rel="noopener">${r.Key}</a></td>
+        <td>
+          <span class="epic-name" title="${r['Epic Name']||''}" style="max-width:200px">${r['Epic Name']||'—'}</span>
+          ${initiative}
+        </td>
+        <td><span class="badge badge-gray">${r.Status}</span></td>
+        <td style="font-size:11px;color:${priorityColor};font-weight:600">${r['Priority']||'—'}</td>
+        <td style="font-size:11px;color:#666">${team}</td>
+        <td style="font-size:11px;color:#444">${r['PM']||'—'}</td>
+        <td style="font-size:11px;color:#444">${r['Eng Lead']||'—'}</td>
+        <td style="font-size:11px;color:#666;white-space:nowrap">${targetDate}</td>
+        <td><div style="font-size:11px;color:#888;margin-bottom:3px">${pct}%</div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${pc}"></div></div></td>
+        <td style="font-size:11px;color:${daysExecColor};font-weight:600;white-space:nowrap">${daysExec}</td>
+        <td style="font-size:11px;color:#666;white-space:nowrap">${daysCur}</td>
+        <td style="font-size:11px;color:${lastUpdColor};font-weight:600;white-space:nowrap">${lastUpd}</td>
+        <td>${r._sig||''}</td>
+      </tr>`;
     }).join('')
-  }</tbody></table>`;
+  }</tbody></table></div>`;
 }
 
 function renderPersonChart(containerId, field, activeStatuses) {
@@ -548,6 +626,182 @@ function personClick(field, name) {
   showTableFromChart(label, rows, r=>`<span class="badge badge-gray">${r.Status}</span>`);
 }
 
+function showTrends(type, btn) {
+  document.querySelectorAll('#trends-tab-bar .tab').forEach(b=>b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const today = new Date();
+  const active = DATA.filter(d => ['In Progress','Blocked','Pending Prod Deploy','Pending Sync'].includes(d.Status));
+  const container = document.getElementById('trends-container');
+
+  if (type === 'summary') {
+    const blocked = DATA.filter(d => d.Status === 'Blocked');
+    const highRisk = DATA.filter(d => (d.Risk||'').includes('High'));
+    const pctVals = active.map(d => d['Pct Done']).filter(v => v !== null);
+    const avgPct = pctVals.length ? Math.round(pctVals.reduce((a,b)=>a+b,0)/pctVals.length) : 0;
+    const noVelocity = active.filter(d => d['Pct Done'] !== null && d['Pct Done'] < 100);
+
+    container.innerHTML = `
+      <div class="trends-summary">
+        <div class="trends-kpi">
+          <div class="trends-kpi-label">Active epics</div>
+          <div class="trends-kpi-value">${active.length}</div>
+          <div class="trends-kpi-delta delta-none">— no prior week data</div>
+        </div>
+        <div class="trends-kpi">
+          <div class="trends-kpi-label">🔴 High risk</div>
+          <div class="trends-kpi-value" style="color:${highRisk.length>0?'#C0392B':'#1E8449'}">${highRisk.length}</div>
+          <div class="trends-kpi-delta delta-none">— no prior week data</div>
+        </div>
+        <div class="trends-kpi">
+          <div class="trends-kpi-label">Blocked</div>
+          <div class="trends-kpi-value" style="color:#C0392B">${blocked.length}</div>
+          <div class="trends-kpi-delta delta-none">— no prior week data</div>
+        </div>
+        <div class="trends-kpi">
+          <div class="trends-kpi-label">Avg % done</div>
+          <div class="trends-kpi-value">${avgPct}%</div>
+          <div class="trends-kpi-delta delta-none">— no prior week data</div>
+        </div>
+        <div class="trends-kpi">
+          <div class="trends-kpi-label">✅ Done this week</div>
+          <div class="trends-kpi-value" style="color:#1E8449">—</div>
+          <div class="trends-kpi-note">needs 2+ weeks of history</div>
+        </div>
+        <div class="trends-kpi">
+          <div class="trends-kpi-label">No velocity</div>
+          <div class="trends-kpi-value" style="color:#854F0B">${noVelocity.length}</div>
+          <div class="trends-kpi-note">active epics with 0% delta</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;font-size:11px;color:#aaa;text-align:center">
+        ℹ️ Week-over-week deltas will appear after the second Monday snapshot runs automatically.
+      </div>`;
+  }
+
+  else if (type === 'stalled') {
+    // Stalled = active, Pct Done = 0 or null, Days in Execution > 14
+    const stalled = active.filter(d =>
+      (d['Pct Done'] === 0 || d['Pct Done'] === null) &&
+      d['Days in Execution'] !== null && d['Days in Execution'] > 14
+    ).sort((a,b) => (b['Days in Execution']||0) - (a['Days in Execution']||0));
+
+    if (!stalled.length) {
+      container.innerHTML = '<div class="trends-no-data">✅ No stalled epics detected this week.</div>';
+      return;
+    }
+    container.innerHTML = `
+      <div style="margin-bottom:10px;font-size:12px;color:#666"><strong>${stalled.length} epics</strong> with no progress and 14+ days in execution.</div>
+      <table class="deadline-risk-table">
+        <thead><tr><th>Key</th><th>Epic name</th><th>Status</th><th>Team</th><th>Days in exec</th><th>Last activity</th></tr></thead>
+        <tbody>${stalled.slice(0,15).map(r => {
+          const team = shortTeam((r['Contributing Teams']||'—').split(';')[0].trim());
+          const lastUpd = r['Last Updated'] !== null ? `${r['Last Updated']}d ago` : '—';
+          const urgColor = r['Days in Execution'] > 180 ? '#C0392B' : r['Days in Execution'] > 90 ? '#E67E22' : '#888';
+          return `<tr>
+            <td><a class="epic-key" href="https://asappinc.atlassian.net/browse/${r.Key}" target="_blank">${r.Key}</a></td>
+            <td><span class="epic-name" title="${r['Epic Name']}">${r['Epic Name']}</span></td>
+            <td><span class="badge badge-gray">${r.Status}</span></td>
+            <td style="font-size:11px;color:#666">${team}</td>
+            <td style="font-weight:600;color:${urgColor}">${r['Days in Execution']}d</td>
+            <td style="color:#888;font-size:11px">${lastUpd}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`;
+  }
+
+  else if (type === 'velocity') {
+    // Team velocity = avg Pct Done per team for active epics
+    // Since we only have 1 week, show current load + avg progress per team
+    const teamStats = {};
+    active.forEach(d => {
+      (d['Contributing Teams']||'').split(';').map(t=>t.trim()).filter(Boolean).forEach(t => {
+        if (!teamStats[t]) teamStats[t] = {total:0, pctSum:0, pctCount:0, blocked:0};
+        teamStats[t].total++;
+        if (d['Pct Done'] !== null) { teamStats[t].pctSum += d['Pct Done']; teamStats[t].pctCount++; }
+        if (d.Status === 'Blocked') teamStats[t].blocked++;
+      });
+    });
+    const sorted = Object.entries(teamStats)
+      .map(([t,s]) => ({team:t, total:s.total, avg: s.pctCount ? Math.round(s.pctSum/s.pctCount) : 0, blocked:s.blocked}))
+      .sort((a,b) => b.total - a.total);
+    const maxTotal = sorted[0]?.total || 1;
+
+    container.innerHTML = `
+      <div style="margin-bottom:12px;font-size:12px;color:#666">
+        Showing current avg % done per team. <span style="color:#aaa">Week-over-week velocity delta available after 2+ snapshots.</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+          ${sorted.map(({team, total, avg, blocked}) => `
+            <div class="velocity-row" title="${team}">
+              <span class="velocity-team">${shortTeam(team)}</span>
+              <div class="velocity-bar-wrap">
+                <div class="velocity-bar" style="width:${Math.round(avg)}%;background:${avg>=75?'#639922':avg>=40?'#378ADD':'#EF9F27'}"></div>
+              </div>
+              <span class="velocity-val">${avg}% avg</span>
+            </div>`).join('')}
+        </div>
+        <div>
+          <table class="deadline-risk-table">
+            <thead><tr><th>Team</th><th>Active</th><th>Blocked</th><th>Avg %</th></tr></thead>
+            <tbody>${sorted.map(({team, total, avg, blocked}) => `
+              <tr>
+                <td style="font-weight:500">${shortTeam(team)}</td>
+                <td>${total}</td>
+                <td style="color:${blocked>0?'#C0392B':'#888'}">${blocked||'—'}</td>
+                <td style="font-weight:600;color:${avg>=75?'#1E8449':avg>=40?'#185FA5':'#854F0B'}">${avg}%</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  }
+
+  else if (type === 'deadline') {
+    const fourWeeks = new Date(today.getTime() + 28*86400000);
+    const atRisk = active.filter(d => {
+      if (!d['Target Date'] || d['Target Date']==='—') return false;
+      const t = new Date(d['Target Date']);
+      if (isNaN(t)) return false;
+      return t <= fourWeeks && (d['Pct Done']||0) < 80;
+    }).map(d => {
+      const t = new Date(d['Target Date']);
+      const daysLeft = Math.floor((t - today) / 86400000);
+      return {...d, _daysLeft: daysLeft};
+    }).sort((a,b) => a._daysLeft - b._daysLeft);
+
+    const overdue = atRisk.filter(d => d._daysLeft < 0);
+    const upcoming = atRisk.filter(d => d._daysLeft >= 0);
+
+    if (!atRisk.length) {
+      container.innerHTML = '<div class="trends-no-data">✅ No epics at deadline risk in the next 4 weeks.</div>';
+      return;
+    }
+    const rows = (label, items) => items.length === 0 ? '' : `
+      <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin:12px 0 6px">${label}</div>
+      <table class="deadline-risk-table">
+        <thead><tr><th>Key</th><th>Epic name</th><th>Team</th><th>% Done</th><th>Target</th><th>Days</th></tr></thead>
+        <tbody>${items.map(r => {
+          const team = shortTeam((r['Contributing Teams']||'—').split(';')[0].trim());
+          const pct = r['Pct Done']||0;
+          const daysLabel = r._daysLeft < 0 ? `${Math.abs(r._daysLeft)}d overdue` : `${r._daysLeft}d left`;
+          const daysColor = r._daysLeft < 0 ? '#C0392B' : r._daysLeft <= 7 ? '#E67E22' : '#854F0B';
+          return `<tr>
+            <td><a class="epic-key" href="https://asappinc.atlassian.net/browse/${r.Key}" target="_blank">${r.Key}</a></td>
+            <td><span class="epic-name" title="${r['Epic Name']}">${r['Epic Name']}</span></td>
+            <td style="font-size:11px;color:#666">${team}</td>
+            <td><div style="font-size:11px;color:#888;margin-bottom:2px">${pct}%</div>
+                <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${pct>=75?'#639922':pct>=40?'#378ADD':'#E24B4A'}"></div></div></td>
+            <td style="font-size:11px;color:#666">${r['Target Date']}</td>
+            <td style="font-weight:600;color:${daysColor};white-space:nowrap">${daysLabel}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`;
+
+    container.innerHTML = rows('🔴 Overdue', overdue) + rows('🟡 Due in next 4 weeks', upcoming);
+  }
+}
+
 // Initialize
 renderMetrics();
 renderInsights();
@@ -560,6 +814,7 @@ const activeForPeople = ['In Progress','Blocked','Pending Prod Deploy','Pending 
 renderPersonChart('pm-chart', 'PM', activeForPeople);
 renderPersonChart('eng-chart', 'Eng Lead', activeForPeople);
 showTable('stalled', document.querySelector('.tab.active'));
+showTrends('summary', document.querySelector('#trends-tab-bar .tab.active'));
 </script>
 </body>
 </html>
