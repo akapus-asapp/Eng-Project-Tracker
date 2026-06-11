@@ -373,18 +373,13 @@ function scrollToTable() {
   window.scrollTo({top: y, behavior: 'smooth'});
 }
 
-function showTableFromChart(title, rows, sigFn) {
-  // Deactivate tab buttons when chart drives the table
-  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
-  if (!rows.length) { document.getElementById('table-container').innerHTML=`<div class="empty">No epics in "${title}".</div>`; scrollToTable(); return; }
-  rows = rows.map(r=>({...r, _sig: sigFn(r)}));
-  document.getElementById('table-container').innerHTML =
-    `<div style="padding:8px 0 10px;font-size:12px;color:#185FA5;font-weight:600;">📊 ${title} — ${rows.length} epic${rows.length!==1?'s':''}</div>` +
-    `<div style="overflow-x:auto"><table class="epic-table"><thead><tr><th>Key</th><th>Epic name</th><th>Status</th><th>Priority</th><th>Owning team</th><th>Contributing teams</th><th>PM</th><th>Eng Lead</th><th>Target date</th><th style="width:80px">Progress</th><th>Exec days</th><th>In status</th><th>Last upd</th><th>Signal</th></tr></thead><tbody>${
+// ── Shared table renderer (used by charts, insights, metrics AND showTable tabs) ──
+function renderEpicTable(rows) {
+  if (!rows.length) return '<div class="empty">No epics match this filter.</div>';
+  return `<div style="overflow-x:auto"><table class="epic-table"><thead><tr><th>Key</th><th>Epic name</th><th>Status</th><th>Priority</th><th>Owning team</th><th>Contributing teams</th><th>PM</th><th>Eng Lead</th><th>Target date</th><th style="width:80px">Progress</th><th>Exec days</th><th>In status</th><th>Last upd</th><th>Signal</th></tr></thead><tbody>${
     rows.map(r => {
       const pct = r['Pct Done']||0;
       const pc = pct>=75?'#639922':pct>=40?'#378ADD':'#E24B4A';
-      const team = shortTeam((r['Contributing Teams']||'—').split(';')[0].trim());
       const targetDate = (!r['Target Date'] || r['Target Date']==='—') ? '—' : r['Target Date'];
       const daysExec = r['Days in Execution'] !== null ? r['Days in Execution']+'d' : '—';
       const daysCur = r['Days in Cur Status'] !== null ? r['Days in Cur Status']+'d' : '—';
@@ -418,6 +413,57 @@ function showTableFromChart(title, rows, sigFn) {
       </tr>`;
     }).join('')
   }</tbody></table></div>`;
+}
+
+// ── Shared header bar (title + team filters + CSV button) ──
+function renderTableHeader(title, unfilteredRows) {
+  // Collect teams
+  const teamSet = new Set();
+  (unfilteredRows||[]).forEach(d => {
+    teamSet.add(owningTeam(d.Key));
+    (d['Contributing Teams']||'').split(';').map(t=>t.trim()).filter(Boolean).forEach(t => teamSet.add(t));
+  });
+  const teams = [...teamSet].sort();
+  if (ACTIVE_TEAM_FILTER && !teamSet.has(ACTIVE_TEAM_FILTER)) ACTIVE_TEAM_FILTER = null;
+
+  const filteredCount = applyTeamFilter(unfilteredRows).length;
+  const teamTags = teams.map(t => {
+    const count = (unfilteredRows||[]).filter(r => owningTeam(r.Key)===t || (r['Contributing Teams']||'').split(';').map(s=>s.trim()).includes(t)).length;
+    const isActive = ACTIVE_TEAM_FILTER === t;
+    return `<button class="filter-tag ${isActive?'active':''}" onclick="setTeamFilter('${t.replace(/'/g,"\\'")}', this)">${shortTeam(t)} <span style="opacity:.6">${count}</span></button>`;
+  }).join('');
+
+  return `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:8px 0 6px">
+    <span style="font-size:12px;color:#185FA5;font-weight:600;">📊 ${title} — <span id="table-count">${filteredCount}</span> epic${filteredCount!==1?'s':''}</span>
+    <button onclick="exportCSV()" style="padding:4px 12px;border-radius:100px;border:1px solid #D0D5DD;background:#fff;cursor:pointer;font-size:11px;font-weight:600;color:#444;display:flex;align-items:center;gap:5px;white-space:nowrap" title="Download current view as CSV">⬇ Export CSV</button>
+  </div>
+  <div style="margin-bottom:10px;font-size:11px;color:#555;font-weight:500;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+    <span style="color:#888;text-transform:uppercase;letter-spacing:.4px;font-size:10px">Filter by team:</span>
+    <button class="filter-tag ${!ACTIVE_TEAM_FILTER?'active':''}" onclick="setTeamFilter(null, this)">All (${(unfilteredRows||[]).length})</button>
+    ${teamTags}
+  </div>`;
+}
+
+function showTableFromChart(title, rows, sigFn) {
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  if (!rows.length) { document.getElementById('table-container').innerHTML=`<div class="empty">No epics in "${title}".</div>`; scrollToTable(); return; }
+
+  // Store context for team filter re-render and CSV export
+  window._currentTableTitle = title;
+  window._currentTableRows = rows; // unfiltered original set (without _sig)
+  window._currentTableSigFn = sigFn;
+  window._currentTableContext = 'chart'; // tells setTeamFilter to re-call showTableFromChart
+
+  const filtered = applyTeamFilter(rows).map(r=>({...r, _sig: sigFn(r)}));
+
+  document.getElementById('table-container').innerHTML =
+    renderTableHeader(title, rows) +
+    renderEpicTable(filtered);
+
+  // Update team-filter-bar (legacy) too so it doesn't look stale
+  const bar = document.getElementById('team-filter-bar');
+  if (bar) bar.innerHTML = '';
+
   scrollToTable();
 }
 
@@ -558,62 +604,36 @@ function showTable(type, btn) {
   const today = new Date();
   let unfiltered = [];
 
+  const tabLabels = {stalled:'Stalled (no progress)',blocked:'Blocked longest',overdue:'Past deadline',inactive:'No activity 30d+',almost:'Almost done (80%+)'};
+
   if (type==='stalled') unfiltered = DATA.filter(d=>['In Progress','Blocked','Pending Prod Deploy'].includes(d.Status)&&(d['Pct Done']===0||d['Pct Done']===null)&&d['Days in Execution']>14).sort((a,b)=>(b['Days in Execution']||0)-(a['Days in Execution']||0));
   if (type==='blocked') unfiltered = DATA.filter(d=>d.Status==='Blocked').sort((a,b)=>(b['Days in Cur Status']||0)-(a['Days in Cur Status']||0));
   if (type==='overdue') unfiltered = DATA.filter(d=>{if(!['In Progress','Blocked','Pending Prod Deploy','Pending Sync'].includes(d.Status))return false;if(!d['Target Date']||d['Target Date']==='—')return false;const t=new Date(d['Target Date']);return !isNaN(t)&&t<today;}).map(d=>{const days=Math.floor((today-new Date(d['Target Date']))/86400000);return{...d,_d:days};}).sort((a,b)=>b._d-a._d);
   if (type==='inactive') unfiltered = DATA.filter(d=>['In Progress','Blocked','Pending Prod Deploy','Pending Sync'].includes(d.Status)&&d['Last Updated']!==null&&d['Last Updated']>=30).sort((a,b)=>(b['Last Updated']||0)-(a['Last Updated']||0));
   if (type==='almost') unfiltered = DATA.filter(d=>(d['Pct Done']||0)>=80&&d.Status!=='Done').sort((a,b)=>(b['Pct Done']||0)-(a['Pct Done']||0));
 
-  // Render filter tags based on teams present in this tab's full result
-  renderTeamFilter(unfiltered);
+  // Store context for setTeamFilter + CSV
+  const title = tabLabels[type] || type;
+  window._currentTableTitle = title;
+  window._currentTableRows = unfiltered;
+  window._currentTableContext = 'tab';
+  window._currentTableType = type;
+  window._currentTableSigFn = null;
 
-  // Now apply team filter and add signal badges
-  let rows = applyTeamFilter(unfiltered).slice(0,50);
+  // Apply team filter
+  let rows = applyTeamFilter(unfiltered);
   if (type==='stalled') rows = rows.map(d=>({...d,_sig:`<span class="badge badge-red">${d['Days in Execution']}d in exec</span>`}));
   if (type==='blocked') rows = rows.map(d=>({...d,_sig:`<span class="badge badge-red">${d['Days in Cur Status']||'—'}d blocked</span>`}));
   if (type==='overdue') rows = rows.map(d=>({...d,_sig:`<span class="badge badge-red">${d._d}d overdue</span>`}));
   if (type==='inactive') rows = rows.map(d=>({...d,_sig:`<span class="badge badge-amber">${d['Last Updated']}d inactive</span>`}));
   if (type==='almost') rows = rows.map(d=>({...d,_sig:`<span class="badge badge-green">${d['Pct Done']}% done</span>`}));
 
-  if (!rows.length) { document.getElementById('table-container').innerHTML='<div class="empty">No epics match this filter.</div>'; return; }
-  document.getElementById('table-container').innerHTML = `<div style="overflow-x:auto"><table class="epic-table"><thead><tr><th>Key</th><th>Epic name</th><th>Status</th><th>Priority</th><th>Owning team</th><th>Contributing teams</th><th>PM</th><th>Eng Lead</th><th>Target date</th><th style="width:80px">Progress</th><th>Exec days</th><th>In status</th><th>Last upd</th><th>Signal</th></tr></thead><tbody>${
-    rows.map(r => {
-      const pct = r['Pct Done']||0;
-      const pc = pct>=75?'#639922':pct>=40?'#378ADD':'#E24B4A';
-      const team = shortTeam((r['Contributing Teams']||'—').split(';')[0].trim());
-      const targetDate = (!r['Target Date'] || r['Target Date']==='—') ? '—' : r['Target Date'];
-      const daysExec = r['Days in Execution'] !== null ? r['Days in Execution']+'d' : '—';
-      const daysCur = r['Days in Cur Status'] !== null ? r['Days in Cur Status']+'d' : '—';
-      const lastUpd = r['Last Updated'] !== null ? r['Last Updated']+'d' : '—';
-      const lastUpdColor = r['Last Updated'] >= 30 ? '#C0392B' : r['Last Updated'] >= 14 ? '#E67E22' : '#666';
-      const daysExecColor = r['Days in Execution'] >= 180 ? '#C0392B' : r['Days in Execution'] >= 90 ? '#E67E22' : '#666';
-      const initiative = r['Initiative'] && r['Initiative']!=='—' ? `<span style="font-size:10px;color:#666;max-width:120px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r['Initiative']}">${r['Initiative']}</span>` : '<span style="color:#ccc;font-size:10px">—</span>';
-      const priorityColor = {'Highest':'#C0392B','High':'#E67E22','Medium':'#854F0B','Low':'#1E8449','Lowest':'#888'}[r['Priority']]||'#888';
-      const ownTeam = owningTeam(r.Key);
-      const ownTeamShort = shortTeam(ownTeam);
-      const contribTeams = (r['Contributing Teams']||'—').split(';').map(t=>t.trim()).filter(Boolean).map(t=>shortTeam(t));
-      const contribHtml = contribTeams.map(t=>`<span class="team-tag">${t}</span>`).join(' ');
-      return `<tr>
-        <td><a class="epic-key" href="https://asappinc.atlassian.net/browse/${r.Key}" target="_blank" rel="noopener">${r.Key}</a></td>
-        <td>
-          <span class="epic-name" title="${r['Epic Name']||''}" style="max-width:200px">${r['Epic Name']||'—'}</span>
-          ${initiative}
-        </td>
-        <td><span class="badge badge-gray">${r.Status}</span></td>
-        <td style="font-size:11px;color:${priorityColor};font-weight:600">${r['Priority']||'—'}</td>
-        <td><span class="team-tag team-tag-own">${ownTeamShort}</span></td>
-        <td style="font-size:11px;max-width:180px;line-height:1.8">${contribHtml}</td>
-        <td style="font-size:11px;color:#444">${r['PM']||'—'}</td>
-        <td style="font-size:11px;color:#444">${r['Eng Lead']||'—'}</td>
-        <td style="font-size:11px;color:#666;white-space:nowrap">${targetDate}</td>
-        <td><div style="font-size:11px;color:#888;margin-bottom:3px">${pct}%</div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${pc}"></div></div></td>
-        <td style="font-size:11px;color:${daysExecColor};font-weight:600;white-space:nowrap">${daysExec}</td>
-        <td style="font-size:11px;color:#666;white-space:nowrap">${daysCur}</td>
-        <td style="font-size:11px;color:${lastUpdColor};font-weight:600;white-space:nowrap">${lastUpd}</td>
-        <td>${r._sig||''}</td>
-      </tr>`;
-    }).join('')
-  }</tbody></table></div>`;
+  // Render filter tags in legacy bar (still used in the attention section)
+  renderTeamFilter(unfiltered);
+
+  document.getElementById('table-container').innerHTML =
+    renderTableHeader(title, unfiltered) +
+    renderEpicTable(rows);
 }
 
 function renderPersonChart(containerId, field, activeStatuses) {
@@ -890,9 +910,52 @@ function renderTeamFilter(rows) {
 
 function setTeamFilter(team, btn) {
   ACTIVE_TEAM_FILTER = team;
-  // Re-run current active tab — it will call renderTeamFilter with filtered rows
-  const activeTab = document.querySelector('.tab.active');
-  if (activeTab) activeTab.click();
+  const ctx = window._currentTableContext;
+  if (ctx === 'chart') {
+    // Re-render chart/insight/metric table with new filter
+    const rows = window._currentTableRows || [];
+    const title = window._currentTableTitle || '';
+    const sigFn = window._currentTableSigFn || (r=>'');
+    const filtered = applyTeamFilter(rows).map(r=>({...r, _sig: sigFn(r)}));
+    document.getElementById('table-container').innerHTML =
+      renderTableHeader(title, rows) +
+      renderEpicTable(filtered);
+  } else {
+    // Re-run current active tab
+    const activeTab = document.querySelector('.tab.active');
+    if (activeTab) activeTab.click();
+  }
+}
+
+function exportCSV() {
+  const rows = applyTeamFilter(window._currentTableRows || []);
+  if (!rows.length) return;
+
+  const headers = ['Key','Epic Name','Initiative','Priority','Status','Active Sprint','% Done','Issues','Contributing Teams','Eng Lead','PM','Target Date','Risk','Days in Execution','Days Since Created','Days in Cur Status','Last Updated'];
+
+  const escape = v => {
+    if (v === null || v === undefined) return '';
+    const s = String(v).replace(/"/g,'""');
+    return (s.includes(',') || s.includes('"') || s.includes('\n')) ? `"${s}"` : s;
+  };
+
+  const lines = [
+    headers.join(','),
+    ...rows.map(r => headers.map(h => {
+      if (h === '% Done') return escape(r['Pct Done'] !== null ? r['Pct Done']+'%' : '—');
+      return escape(r[h]);
+    }).join(','))
+  ];
+
+  const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const title = (window._currentTableTitle || 'epics').replace(/[^a-z0-9]+/gi,'-').toLowerCase();
+  const team = ACTIVE_TEAM_FILTER ? '-' + shortTeam(ACTIVE_TEAM_FILTER).replace(/[^a-z0-9]+/gi,'-').toLowerCase() : '';
+  a.href = url;
+  a.download = `asapp-epics-${title}${team}-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function applyTeamFilter(rows) {
