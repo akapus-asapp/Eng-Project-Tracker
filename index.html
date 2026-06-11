@@ -168,7 +168,7 @@
   <div class="divider">Epics needing attention</div>
   <div class="card">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-      <span style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.4px">Filter by team:</span>
+      <span style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.4px">Filter by team (owner or contributor):</span>
       <div id="team-filter-bar" style="display:flex;flex-wrap:wrap;gap:4px"></div>
     </div>
     <div class="tab-bar">
@@ -355,7 +355,7 @@ function renderTeamRisk() {
   const noteEl = document.getElementById('team-risk-note');
   if (noteEl) {
     if (totalHigh === 0 && totalMed === 0) {
-      noteEl.innerHTML = '⚠️ <strong>Risk column not set.</strong> All epics show 🟢 Low because the Risk field in the Stakeholder View is filled manually. Open the sheet and update the Risk column for epics that need attention.';
+      noteEl.innerHTML = '⚠️ <strong>Risk column not set.</strong> All epics show 🟢 Low because the Risk field in the Stakeholder View is filled manually. <a href="https://docs.google.com/spreadsheets/d/1EjG3Jb96kQ6m75bw6DJNo_j86-M8SESOJI90s05Hawc/edit?gid=38005099" target="_blank" style="color:#185FA5">Open the sheet</a> and update the Risk column for epics that need attention.';
     } else if (totalHigh === 0) {
       noteEl.innerHTML = `ℹ️ No High risk epics flagged. ${totalMed} medium risk epic${totalMed!==1?'s':''} to review.`;
     } else {
@@ -365,7 +365,12 @@ function renderTeamRisk() {
 }
 
 function scrollToTable() {
-  document.querySelector('.card:last-child').scrollIntoView({behavior:'smooth', block:'start'});
+  const el = document.getElementById('table-container');
+  if (!el) return;
+  const card = el.closest('.card');
+  if (!card) return;
+  const y = card.getBoundingClientRect().top + window.scrollY - 80;
+  window.scrollTo({top: y, behavior: 'smooth'});
 }
 
 function showTableFromChart(title, rows, sigFn) {
@@ -866,7 +871,13 @@ function setTeamFilter(team, btn) {
 
 function applyTeamFilter(rows) {
   if (!ACTIVE_TEAM_FILTER) return rows;
-  return rows.filter(r => owningTeam(r.Key) === ACTIVE_TEAM_FILTER);
+  return rows.filter(r => {
+    // Match owning team
+    if (owningTeam(r.Key) === ACTIVE_TEAM_FILTER) return true;
+    // Also match contributing teams
+    const contrib = (r['Contributing Teams']||'').split(';').map(t=>t.trim()).filter(Boolean);
+    return contrib.includes(ACTIVE_TEAM_FILTER);
+  });
 }
 
 // Initialize
