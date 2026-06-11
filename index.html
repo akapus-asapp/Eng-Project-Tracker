@@ -555,13 +555,25 @@ function renderExecChart() {
 function showTable(type, btn) {
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  const today = new Date(); let rows = [];
+  const today = new Date();
+  let unfiltered = [];
 
-  if (type==='stalled') rows = applyTeamFilter(DATA.filter(d=>['In Progress','Blocked','Pending Prod Deploy'].includes(d.Status)&&(d['Pct Done']===0||d['Pct Done']===null)&&d['Days in Execution']>14).sort((a,b)=>(b['Days in Execution']||0)-(a['Days in Execution']||0))).slice(0,30).map(d=>({...d,_sig:`<span class="badge badge-red">${d['Days in Execution']}d in exec</span>`}));
-  if (type==='blocked') rows = applyTeamFilter(DATA.filter(d=>d.Status==='Blocked').sort((a,b)=>(b['Days in Cur Status']||0)-(a['Days in Cur Status']||0))).slice(0,30).map(d=>({...d,_sig:`<span class="badge badge-red">${d['Days in Cur Status']||'—'}d blocked</span>`}));
-  if (type==='overdue') rows = applyTeamFilter(DATA.filter(d=>{if(!['In Progress','Blocked','Pending Prod Deploy','Pending Sync'].includes(d.Status))return false;if(!d['Target Date']||d['Target Date']==='—')return false;const t=new Date(d['Target Date']);return !isNaN(t)&&t<today;}).map(d=>{const days=Math.floor((today-new Date(d['Target Date']))/86400000);return{...d,_sig:`<span class="badge badge-red">${days}d overdue</span>`,_d:days};}).sort((a,b)=>b._d-a._d)).slice(0,30);
-  if (type==='inactive') rows = applyTeamFilter(DATA.filter(d=>['In Progress','Blocked','Pending Prod Deploy','Pending Sync'].includes(d.Status)&&d['Last Updated']!==null&&d['Last Updated']>=30).sort((a,b)=>(b['Last Updated']||0)-(a['Last Updated']||0))).slice(0,30).map(d=>({...d,_sig:`<span class="badge badge-amber">${d['Last Updated']}d inactive</span>`}));
-  if (type==='almost') rows = applyTeamFilter(DATA.filter(d=>(d['Pct Done']||0)>=80&&d.Status!=='Done').sort((a,b)=>(b['Pct Done']||0)-(a['Pct Done']||0))).slice(0,30).map(d=>({...d,_sig:`<span class="badge badge-green">${d['Pct Done']}% done</span>`}));
+  if (type==='stalled') unfiltered = DATA.filter(d=>['In Progress','Blocked','Pending Prod Deploy'].includes(d.Status)&&(d['Pct Done']===0||d['Pct Done']===null)&&d['Days in Execution']>14).sort((a,b)=>(b['Days in Execution']||0)-(a['Days in Execution']||0));
+  if (type==='blocked') unfiltered = DATA.filter(d=>d.Status==='Blocked').sort((a,b)=>(b['Days in Cur Status']||0)-(a['Days in Cur Status']||0));
+  if (type==='overdue') unfiltered = DATA.filter(d=>{if(!['In Progress','Blocked','Pending Prod Deploy','Pending Sync'].includes(d.Status))return false;if(!d['Target Date']||d['Target Date']==='—')return false;const t=new Date(d['Target Date']);return !isNaN(t)&&t<today;}).map(d=>{const days=Math.floor((today-new Date(d['Target Date']))/86400000);return{...d,_d:days};}).sort((a,b)=>b._d-a._d);
+  if (type==='inactive') unfiltered = DATA.filter(d=>['In Progress','Blocked','Pending Prod Deploy','Pending Sync'].includes(d.Status)&&d['Last Updated']!==null&&d['Last Updated']>=30).sort((a,b)=>(b['Last Updated']||0)-(a['Last Updated']||0));
+  if (type==='almost') unfiltered = DATA.filter(d=>(d['Pct Done']||0)>=80&&d.Status!=='Done').sort((a,b)=>(b['Pct Done']||0)-(a['Pct Done']||0));
+
+  // Render filter tags based on teams present in this tab's full result
+  renderTeamFilter(unfiltered);
+
+  // Now apply team filter and add signal badges
+  let rows = applyTeamFilter(unfiltered).slice(0,50);
+  if (type==='stalled') rows = rows.map(d=>({...d,_sig:`<span class="badge badge-red">${d['Days in Execution']}d in exec</span>`}));
+  if (type==='blocked') rows = rows.map(d=>({...d,_sig:`<span class="badge badge-red">${d['Days in Cur Status']||'—'}d blocked</span>`}));
+  if (type==='overdue') rows = rows.map(d=>({...d,_sig:`<span class="badge badge-red">${d._d}d overdue</span>`}));
+  if (type==='inactive') rows = rows.map(d=>({...d,_sig:`<span class="badge badge-amber">${d['Last Updated']}d inactive</span>`}));
+  if (type==='almost') rows = rows.map(d=>({...d,_sig:`<span class="badge badge-green">${d['Pct Done']}% done</span>`}));
 
   if (!rows.length) { document.getElementById('table-container').innerHTML='<div class="empty">No epics match this filter.</div>'; return; }
   document.getElementById('table-container').innerHTML = `<div style="overflow-x:auto"><table class="epic-table"><thead><tr><th>Key</th><th>Epic name</th><th>Status</th><th>Priority</th><th>Owning team</th><th>Contributing teams</th><th>PM</th><th>Eng Lead</th><th>Target date</th><th style="width:80px">Progress</th><th>Exec days</th><th>In status</th><th>Last upd</th><th>Signal</th></tr></thead><tbody>${
@@ -851,20 +863,34 @@ function owningTeam(key) {
 // ── Team filter state ──────────────────────────────────────────
 let ACTIVE_TEAM_FILTER = null;
 
-function renderTeamFilter() {
-  // Get all unique owning teams from full DATA
-  const teams = [...new Set(DATA.map(d => owningTeam(d.Key)))].sort();
+function renderTeamFilter(rows) {
   const bar = document.getElementById('team-filter-bar');
   if (!bar) return;
-  bar.innerHTML = `<button class="filter-tag active" onclick="setTeamFilter(null, this)">All</button>` +
-    teams.map(t => `<button class="filter-tag" onclick="setTeamFilter('${t.replace(/'/g,"\'")}', this)">${shortTeam(t)}</button>`).join('');
+
+  // Collect all teams present in the current rows (owning + contributing)
+  const teamSet = new Set();
+  (rows||[]).forEach(d => {
+    teamSet.add(owningTeam(d.Key));
+    (d['Contributing Teams']||'').split(';').map(t=>t.trim()).filter(Boolean).forEach(t => teamSet.add(t));
+  });
+  const teams = [...teamSet].sort();
+
+  // If current filter is no longer in the new set, reset it
+  if (ACTIVE_TEAM_FILTER && !teamSet.has(ACTIVE_TEAM_FILTER)) {
+    ACTIVE_TEAM_FILTER = null;
+  }
+
+  bar.innerHTML = `<button class="filter-tag ${!ACTIVE_TEAM_FILTER?'active':''}" onclick="setTeamFilter(null, this)">All (${(rows||[]).length})</button>` +
+    teams.map(t => {
+      const count = (rows||[]).filter(r => owningTeam(r.Key)===t || (r['Contributing Teams']||'').split(';').map(s=>s.trim()).includes(t)).length;
+      const isActive = ACTIVE_TEAM_FILTER === t;
+      return `<button class="filter-tag ${isActive?'active':''}" onclick="setTeamFilter('${t.replace(/'/g,"\'")}', this)">${shortTeam(t)} <span style="opacity:.6">${count}</span></button>`;
+    }).join('');
 }
 
 function setTeamFilter(team, btn) {
   ACTIVE_TEAM_FILTER = team;
-  document.querySelectorAll('#team-filter-bar .filter-tag').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  // Re-run current active tab
+  // Re-run current active tab — it will call renderTeamFilter with filtered rows
   const activeTab = document.querySelector('.tab.active');
   if (activeTab) activeTab.click();
 }
@@ -872,9 +898,7 @@ function setTeamFilter(team, btn) {
 function applyTeamFilter(rows) {
   if (!ACTIVE_TEAM_FILTER) return rows;
   return rows.filter(r => {
-    // Match owning team
     if (owningTeam(r.Key) === ACTIVE_TEAM_FILTER) return true;
-    // Also match contributing teams
     const contrib = (r['Contributing Teams']||'').split(';').map(t=>t.trim()).filter(Boolean);
     return contrib.includes(ACTIVE_TEAM_FILTER);
   });
@@ -891,7 +915,6 @@ renderExecChart();
 const activeForPeople = ['In Progress','Blocked','Pending Prod Deploy','Pending Sync','Unstarted','Backlog'];
 renderPersonChart('pm-chart', 'PM', activeForPeople);
 renderPersonChart('eng-chart', 'Eng Lead', activeForPeople);
-renderTeamFilter();
 showTable('stalled', document.querySelector('.tab.active'));
 showTrends('summary', document.querySelector('#trends-tab-bar .tab.active'));
 </script>
