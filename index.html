@@ -682,6 +682,18 @@ function personClick(field, name) {
   showTableFromChart(label, rows, r=>`<span class="badge badge-gray">${r.Status}</span>`);
 }
 
+function _trendClick(key) {
+  const maps = {
+    active:      [window._trendActive,      'Active epics',                  r => ''],
+    highRisk:    [window._trendHighRisk,    'High risk epics',               r => '<span class="badge badge-red">🔴 High</span>'],
+    blocked:     [window._trendBlocked,     'Blocked epics',                 r => '<span class="badge badge-red">'+(r['Days in Cur Status']!==null?r['Days in Cur Status']+'d blocked':'Blocked')+'</span>'],
+    avgPct:      [[...(window._trendActive||[])].sort((a,b)=>(b['Pct Done']||0)-(a['Pct Done']||0)), 'Active epics (by % done)', r => '<span class="badge badge-gray">'+(r['Pct Done']!==null?r['Pct Done']+'%':'—')+'</span>'],
+    noVelocity:  [window._trendNoVelocity,  'No velocity (active, <100%)',   r => '<span class="badge badge-amber">0% delta</span>'],
+  };
+  const [rows, title, sigFn] = maps[key] || [[], key, r => ''];
+  if (rows && rows.length) showTableFromChart(title, rows, sigFn);
+}
+
 function showTrends(type, btn) {
   document.querySelectorAll('#trends-tab-bar .tab').forEach(b=>b.classList.remove('active'));
   if (btn) btn.classList.add('active');
@@ -696,37 +708,50 @@ function showTrends(type, btn) {
     const avgPct = pctVals.length ? Math.round(pctVals.reduce((a,b)=>a+b,0)/pctVals.length) : 0;
     const noVelocity = active.filter(d => d['Pct Done'] !== null && d['Pct Done'] < 100);
 
+    // Store datasets for safe onclick access (avoids JSON.stringify in HTML attributes)
+    window._trendActive = active;
+    window._trendHighRisk = highRisk;
+    window._trendBlocked = blocked;
+    window._trendNoVelocity = noVelocity;
+
+    const kS = 'cursor:pointer;transition:box-shadow .15s,transform .15s';
+    const kH = `onmouseenter="this.style.cssText+=';box-shadow:0 4px 16px rgba(0,0,0,.1);transform:translateY(-2px)'" onmouseleave="this.style.boxShadow='';this.style.transform=''"`;
     container.innerHTML = `
       <div class="trends-summary">
-        <div class="trends-kpi">
+        <div class="trends-kpi" style="${kS}" ${kH} onclick="_trendClick('active')">
           <div class="trends-kpi-label">Active epics</div>
           <div class="trends-kpi-value">${active.length}</div>
           <div class="trends-kpi-delta delta-none">— no prior week data</div>
+          <div style="color:#4A90D9;font-size:10px;margin-top:6px">See ${active.length} epics →</div>
         </div>
-        <div class="trends-kpi">
+        <div class="trends-kpi" style="${kS}" ${kH} onclick="_trendClick('highRisk')">
           <div class="trends-kpi-label">🔴 High risk</div>
           <div class="trends-kpi-value" style="color:${highRisk.length>0?'#C0392B':'#1E8449'}">${highRisk.length}</div>
           <div class="trends-kpi-delta delta-none">— no prior week data</div>
+          <div style="color:#4A90D9;font-size:10px;margin-top:6px">See ${highRisk.length} epics →</div>
         </div>
-        <div class="trends-kpi">
+        <div class="trends-kpi" style="${kS}" ${kH} onclick="_trendClick('blocked')">
           <div class="trends-kpi-label">Blocked</div>
           <div class="trends-kpi-value" style="color:#C0392B">${blocked.length}</div>
           <div class="trends-kpi-delta delta-none">— no prior week data</div>
+          <div style="color:#4A90D9;font-size:10px;margin-top:6px">See ${blocked.length} epics →</div>
         </div>
-        <div class="trends-kpi">
+        <div class="trends-kpi" style="${kS}" ${kH} onclick="_trendClick('avgPct')">
           <div class="trends-kpi-label">Avg % done</div>
           <div class="trends-kpi-value">${avgPct}%</div>
           <div class="trends-kpi-delta delta-none">— no prior week data</div>
+          <div style="color:#4A90D9;font-size:10px;margin-top:6px">See ${active.length} epics →</div>
         </div>
-        <div class="trends-kpi">
+        <div class="trends-kpi" style="opacity:.65">
           <div class="trends-kpi-label">✅ Done this week</div>
           <div class="trends-kpi-value" style="color:#1E8449">—</div>
           <div class="trends-kpi-note">needs 2+ weeks of history</div>
         </div>
-        <div class="trends-kpi">
+        <div class="trends-kpi" style="${kS}" ${kH} onclick="_trendClick('noVelocity')">
           <div class="trends-kpi-label">No velocity</div>
           <div class="trends-kpi-value" style="color:#854F0B">${noVelocity.length}</div>
           <div class="trends-kpi-note">active epics with 0% delta</div>
+          <div style="color:#4A90D9;font-size:10px;margin-top:6px">See ${noVelocity.length} epics →</div>
         </div>
       </div>
       <div style="margin-top:12px;font-size:11px;color:#aaa;text-align:center">
