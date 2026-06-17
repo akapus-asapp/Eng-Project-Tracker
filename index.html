@@ -68,6 +68,15 @@
   .divider { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 1px; margin: 20px 0 12px; }
   .empty { padding: 24px; text-align: center; color: #888; font-size: 13px; }
   .data-badge { background: #E8F4FD; color: #185FA5; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .header-status { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .header-status-row { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+  .header-status-label { color: #aaa; font-weight: 400; }
+  .header-status-value { font-weight: 600; padding: 1px 8px; border-radius: 20px; }
+  .hsbadge-today { background: #E8F4FD; color: #185FA5; }
+  .hsbadge-age-ok { background: #F0FDF4; color: #1E8449; }
+  .hsbadge-age-warn { background: #FFFBEB; color: #854F0B; }
+  .hsbadge-age-old { background: #FEF2F2; color: #C0392B; }
+  .hsbadge-next { background: #F3F0FF; color: #5B21B6; }
   .filter-tag { padding: 3px 10px; border-radius: 100px; border: 1px solid #D0D5DD; background: #fff; cursor: pointer; font-size: 11px; color: #555; font-weight: 500; transition: all .12s; white-space: nowrap; }
   .filter-tag:hover { border-color: #185FA5; color: #185FA5; }
   .filter-tag.active { background: #185FA5; color: #fff; border-color: #185FA5; }
@@ -105,8 +114,60 @@
     <h1>ASAPP Engineering Portfolio</h1>
     <p id="header-sub">294 epics · data from Jun 16, 2026, 4:06 PM GMT-3</p>
   </div>
-  <span class="data-badge">&#128197; Jun 16, 2026</span>
+  <div class="header-status" id="header-status-panel">
+    <!-- populated by JS below -->
+  </div>
 </div>
+
+<script>
+(function() {
+  const now = new Date();
+
+  // Today
+  const todayStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+  // Data age — parse from header-sub text
+  const subEl = document.getElementById('header-sub');
+  let dataAgeLabel = '—';
+  let ageClass = 'hsbadge-age-ok';
+  if (subEl) {
+    const subText = subEl.textContent || '';
+    // Try to extract date from "data from Jun 16, 2026, ..."
+    const m = subText.match(/data from ([A-Z][a-z]+ \d+, \d+)/);
+    if (m) {
+      const dataDate = new Date(m[1]);
+      if (!isNaN(dataDate)) {
+        const ageDays = Math.floor((now - dataDate) / (1000 * 60 * 60 * 24));
+        if (ageDays === 0) { dataAgeLabel = 'Fresh today'; ageClass = 'hsbadge-age-ok'; }
+        else if (ageDays === 1) { dataAgeLabel = '1 day old'; ageClass = 'hsbadge-age-ok'; }
+        else if (ageDays <= 7) { dataAgeLabel = ageDays + ' days old'; ageClass = 'hsbadge-age-warn'; }
+        else { dataAgeLabel = ageDays + ' days old'; ageClass = 'hsbadge-age-old'; }
+      }
+    }
+  }
+
+  // Next refresh — next Monday
+  const daysUntilMonday = (8 - now.getDay()) % 7 || 7;
+  const nextMonday = new Date(now);
+  nextMonday.setDate(now.getDate() + daysUntilMonday);
+  const nextStr = nextMonday.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+  const panel = document.getElementById('header-status-panel');
+  panel.innerHTML =
+    '<div class="header-status-row">' +
+      '<span class="header-status-label">Today</span>' +
+      '<span class="header-status-value hsbadge-today">&#128197; ' + todayStr + '</span>' +
+    '</div>' +
+    '<div class="header-status-row">' +
+      '<span class="header-status-label">Data age</span>' +
+      '<span class="header-status-value ' + ageClass + '">' + dataAgeLabel + '</span>' +
+    '</div>' +
+    '<div class="header-status-row">' +
+      '<span class="header-status-label">Next refresh</span>' +
+      '<span class="header-status-value hsbadge-next">&#128260; ' + nextStr + '</span>' +
+    '</div>';
+})();
+</script>
 
 <div class="main">
   <div class="metrics-grid" id="metrics-grid"></div>
