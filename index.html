@@ -270,7 +270,7 @@ function renderMetrics() {
   const highRisk = DATA.filter(d => (d.Risk||'').includes('High'));
   const inSprint = DATA.filter(d => (d['Active Sprint']||'').includes('Active'));
   const done = DATA.filter(d => d.Status === 'Done');
-  const pctVals = DATA.map(d => d['Pct Done']).filter(v => v !== null);
+  const pctVals = active.map(d => d['Pct Done']).filter(v => v !== null);
   const avgPct = pctVals.length ? Math.round(pctVals.reduce((a,b)=>a+b,0)/pctVals.length) : 0;
 
   const metrics = [
@@ -278,14 +278,14 @@ function renderMetrics() {
      rows: DATA, sigFn: r=>`<span class="badge badge-gray">${r.Status}</span>`},
     {l:'Active',       v: active.length,      c:'blue',  n:'In Progress + Blocked',
      rows: active.sort((a,b)=>(b['Pct Done']||0)-(a['Pct Done']||0)), sigFn: r=>`<span class="badge badge-gray">${r.Status}</span>`},
-    {l:'Blocked',      v: blocked.length,     c:'red',   n: Math.round(blocked.length/DATA.length*100)+'% of portfolio',
+    {l:'Blocked',      v: blocked.length,     c:'red',   n: Math.round(blocked.length/active.length*100)+'% of active epics',
      rows: blocked.sort((a,b)=>(b['Days in Cur Status']||0)-(a['Days in Cur Status']||0)), sigFn: r=>`<span class="badge badge-red">${r['Days in Cur Status']||'—'}d blocked</span>`},
     {l:'High risk',    v: highRisk.length,    c:'red',   n:'manually flagged',
      rows: highRisk, sigFn: r=>`<span class="badge badge-red">🔴 High risk</span>`},
     {l:'In sprint',    v: inSprint.length,    c:'green', n:'with active child issues',
      rows: inSprint.sort((a,b)=>(b['Pct Done']||0)-(a['Pct Done']||0)), sigFn: r=>`<span class="badge badge-green">${Math.round(r['Pct Done']||0)}% done</span>`},
-    {l:'Avg progress', v: avgPct+'%',         c:'',      n:'across all epics',
-     rows: DATA.filter(d=>d['Pct Done']!==null).sort((a,b)=>b['Pct Done']-a['Pct Done']), sigFn: r=>`<span class="badge badge-gray">${Math.round(r['Pct Done']||0)}% done</span>`},
+    {l:'Avg progress', v: avgPct+'%',         c:'',      n:'across active epics',
+     rows: active.filter(d=>d['Pct Done']!==null).sort((a,b)=>b['Pct Done']-a['Pct Done']), sigFn: r=>`<span class="badge badge-gray">${Math.round(r['Pct Done']||0)}% done</span>`},
     {l:'Done',         v: done.length,        c:'green', n:'completed epics',
      rows: done, sigFn: r=>`<span class="badge badge-green">✓ Done</span>`},
   ];
@@ -365,6 +365,41 @@ function renderInsights() {
     rows: active.filter(d=>(d['Contributing Teams']||'').includes(bt[0])).sort((a,b)=>(b['Pct Done']||0)-(a['Pct Done']||0)),
     sigFn: r=>`<span class="badge badge-gray">${r.Status}</span>`,
     label: `Most loaded: ${bt[0]}`});
+
+  // 8. Long runners: active epics with 180+ days in execution
+  const lr = active.filter(d => (d['Days in Execution']||0) >= 180)
+    .sort((a,b)=>(b['Days in Execution']||0)-(a['Days in Execution']||0));
+  if (lr.length) ins.push({t:'amber',
+    m:`<strong>${lr.length} active epic${lr.length>1?'s have':' has'} been in execution for 180+ days.</strong> Longest: <strong>${lr[0].Key}</strong> (${lr[0]['Days in Execution']}d). These may be scoped too broadly or carry hidden risk.`,
+    rows: lr, sigFn: r=>`<span class="badge badge-amber">${r['Days in Execution']}d in execution</span>`,
+    label: 'Long runners (180+d)'});
+
+  // 9. Active epics with no target date
+  const noDate = active.filter(d => !d['Target Date'] || d['Target Date']==='—')
+    .sort((a,b)=>(b['Days in Execution']||0)-(a['Days in Execution']||0));
+  if (noDate.length) ins.push({t:'amber',
+    m:`<strong>${noDate.length} active epic${noDate.length>1?'s have':' has'} no target date</strong> (${Math.round(noDate.length/active.length*100)}% of active). Without a deadline, these can't be tracked for delivery risk.`,
+    rows: noDate, sigFn: r=>`<span class="badge badge-gray">no deadline set</span>`,
+    label: 'No target date'});
+
+  // 10. In active sprint but 0% done
+  const zeroSprint = active.filter(d => (d['Active Sprint']||'').includes('Active') && (d['Pct Done']||0) === 0)
+    .sort((a,b)=>(b['Days in Execution']||0)-(a['Days in Execution']||0));
+  if (zeroSprint.length) ins.push({t:'amber',
+    m:`<strong>${zeroSprint.length} epic${zeroSprint.length>1?'s are':' is'} in an active sprint but still at 0% done.</strong> Sprint scope may be too broad or child issues aren't being closed.`,
+    rows: zeroSprint, sigFn: r=>`<span class="badge badge-amber">in sprint · 0% done</span>`,
+    label: 'In sprint, 0% done'});
+
+  // 11. Stalled: In Progress/Blocked, 0% or null done, 14+d in execution
+  const stalled = DATA.filter(d =>
+    ['In Progress','Blocked','Pending Prod Deploy'].includes(d.Status) &&
+    (d['Pct Done'] === 0 || d['Pct Done'] === null) &&
+    (d['Days in Execution']||0) > 14
+  ).sort((a,b)=>(b['Days in Execution']||0)-(a['Days in Execution']||0));
+  if (stalled.length) ins.push({t:'red',
+    m:`<strong>${stalled.length} epic${stalled.length>1?'s are':' is'} stalled</strong> — In Progress or Blocked with 0% completion and 14+ days in execution. No child issues are being closed.`,
+    rows: stalled, sigFn: r=>`<span class="badge badge-red">${r['Days in Execution']}d exec · 0% done</span>`,
+    label: 'Stalled (0% done)'});
 
   if (!ins.length) { document.getElementById('insights-container').innerHTML='<div class="insight green">Portfolio looks healthy — no critical signals detected.</div>'; return; }
 
