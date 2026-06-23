@@ -173,7 +173,29 @@
   <div class="metrics-grid" id="metrics-grid"></div>
 
   <div class="divider">Key insights</div>
-  <div class="card" style="margin-bottom:16px"><div id="insights-container"></div></div>
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleInsights()">
+      <div id="insights-summary" style="font-size:12px;color:#888"></div>
+      <button id="insights-toggle-btn" style="background:none;border:none;cursor:pointer;font-size:12px;color:#4a90d9;font-weight:600;padding:0">Hide ▲</button>
+    </div>
+    <div id="insights-container" style="margin-top:8px"></div>
+  </div>
+
+  <div class="divider">Active Initiatives</div>
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleInitSection()">
+      <div>
+        <span class="card-title" style="margin:0">By Initiative</span>
+        <span style="font-size:10px;color:#aaa;font-weight:400;margin-left:6px">· only initiatives with epics in an active sprint · tap a row to drill down</span>
+      </div>
+      <button id="init-toggle-btn" style="background:none;border:none;cursor:pointer;font-size:12px;color:#4a90d9;font-weight:600;padding:0">Hide ▲</button>
+    </div>
+    <div id="init-body">
+      <div id="init-chart" style="margin-top:12px;margin-bottom:4px"></div>
+      <div id="init-table-wrap" style="display:none;margin-top:12px"></div>
+      <div id="init-insights" style="margin-top:16px"></div>
+    </div>
+  </div>
 
   <div class="grid-2">
     <div class="card">
@@ -224,13 +246,6 @@
       <div class="card-title">By Eng Lead <span style="font-size:10px;color:#aaa;font-weight:400">· tap a name to see their epics</span></div>
       <div id="eng-chart" style="max-height:280px;overflow-y:auto"></div>
     </div>
-  </div>
-
-  <div class="divider">Active Initiatives</div>
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-title">By Initiative <span style="font-size:10px;color:#aaa;font-weight:400">· only initiatives with epics in an active sprint · tap to drill down</span></div>
-    <div id="init-chart" style="margin-bottom:20px"></div>
-    <div id="init-table-wrap" style="display:none;margin-top:12px"></div>
   </div>
 
   <div class="divider">Epics needing attention</div>
@@ -410,6 +425,22 @@ function renderInsights() {
 
   if (!ins.length) { document.getElementById('insights-container').innerHTML='<div class="insight green">Portfolio looks healthy — no critical signals detected.</div>'; return; }
 
+  // Sort by severity: red → amber → green → blue
+  const sevOrder = {red:0, amber:1, green:2, blue:3};
+  ins.sort((a,b) => (sevOrder[a.t]??9) - (sevOrder[b.t]??9));
+
+  // Summary badge counts
+  const redCount   = ins.filter(i=>i.t==='red').length;
+  const amberCount = ins.filter(i=>i.t==='amber').length;
+  const greenCount = ins.filter(i=>i.t==='green').length;
+  const summaryEl  = document.getElementById('insights-summary');
+  if (summaryEl) {
+    summaryEl.innerHTML =
+      (redCount   ? `<span style="background:#fde8e8;color:#d9534f;border-radius:4px;padding:2px 8px;font-weight:700;margin-right:4px">${redCount} critical</span>` : '') +
+      (amberCount ? `<span style="background:#fff8e1;color:#b8860b;border-radius:4px;padding:2px 8px;font-weight:700;margin-right:4px">${amberCount} warning</span>` : '') +
+      (greenCount ? `<span style="background:#e8f5e9;color:#2e7d32;border-radius:4px;padding:2px 8px;font-weight:700;margin-right:4px">${greenCount} positive</span>` : '');
+  }
+
   // Store for click handler
   window._insightData = ins;
 
@@ -419,6 +450,15 @@ function renderInsights() {
       <span class="insight-cta">See ${i.rows?.length||0} epics →</span>
     </div>`
   ).join('');
+}
+
+function toggleInsights() {
+  const container = document.getElementById('insights-container');
+  const btn       = document.getElementById('insights-toggle-btn');
+  if (!container || !btn) return;
+  const collapsed = container.style.display === 'none';
+  container.style.display = collapsed ? 'block' : 'none';
+  btn.textContent = collapsed ? 'Hide ▲' : 'Show ▼';
 }
 
 function insightClick(idx) {
@@ -1141,17 +1181,17 @@ function renderInitiatives() {
 
   function renderChart() {
     const maxActive = Math.max(...active.map(x => x.inSprint.length));
-    container.innerHTML = active.map(({ name, all, inSprint, blocked, highRisk, avg }) => {
+    container.innerHTML = active.map(({ name, all, inSprint, blocked, highRisk, avg }, idx) => {
       const barW   = Math.max(4, Math.round((inSprint.length / maxActive) * 100));
       const riskDot = highRisk.length ? '<span style="color:#d9534f;font-weight:700;margin-left:4px">●</span>' : '';
       const blkTag  = blocked.length  ? `<span style="background:#fde8e8;color:#d9534f;border-radius:3px;font-size:10px;padding:1px 5px;margin-left:4px">${blocked.length} blocked</span>` : '';
       const isSelected = selectedInit === name;
       return `
-        <div onclick="_initClick('${name.replace(/'/g,"\\'")}',this)"
+        <div data-init-idx="${idx}" onclick="_initClick(this)"
              style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;cursor:pointer;margin-bottom:2px;
                     background:${isSelected ? '#EFF6FF' : 'transparent'};transition:background .15s">
           <div style="width:200px;min-width:120px;font-size:12px;font-weight:600;color:#1e3a5f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0"
-               title="${name}">${name}${riskDot}</div>
+               title="${name.replace(/"/g,'&quot;')}">${name}${riskDot}</div>
           <div style="flex:1;background:#e8f0fe;border-radius:4px;height:14px;min-width:60px">
             <div style="height:14px;border-radius:4px;background:${avg >= 70 ? '#2ecc71' : avg >= 40 ? '#f39c12' : '#4a90d9'};width:${barW}%"></div>
           </div>
@@ -1172,15 +1212,18 @@ function renderInitiatives() {
       </div>`);
   }
 
-  window._initClick = function(name, el) {
+  window._initClick = function(el) {
+    const idx  = parseInt(el.getAttribute('data-init-idx'));
+    const item = active[idx];
+    if (!item) return;
+    const { name, all, inSprint } = item;
+
     if (selectedInit === name) {
       selectedInit = null;
       tableWrap.style.display = 'none';
       tableWrap.innerHTML = '';
     } else {
       selectedInit = name;
-      const { all, inSprint } = active.find(x => x.name === name) || {};
-      if (!all) return;
 
       // Show epics for this initiative — active ones first
       const sorted = [...all].sort((a,b) => {
@@ -1228,6 +1271,78 @@ function renderInitiatives() {
   };
 
   renderChart();
+
+  // ── Initiative-level insights ──────────────────────────────────
+  const initInsights = [];
+  const ACTIVE_S2 = new Set(['In Progress','Blocked','Pending Prod Deploy','Pending Sync']);
+
+  // 1. Initiatives with high-risk epics
+  const highRiskInits = active.filter(x => x.highRisk.length > 0)
+    .sort((a,b) => b.highRisk.length - a.highRisk.length);
+  if (highRiskInits.length) {
+    initInsights.push({t:'red',
+      m:`<strong>${highRiskInits.length} active initiative${highRiskInits.length>1?'s have':' has'} high-risk epics.</strong> ` +
+        highRiskInits.slice(0,3).map(x=>`<strong>${x.name}</strong> (${x.highRisk.length}🔴)`).join(', ') +
+        (highRiskInits.length > 3 ? ` and ${highRiskInits.length-3} more.` : '.'),
+      label: 'Initiatives with high risk'});
+  }
+
+  // 2. Initiatives with blocked epics
+  const blockedInits = active.filter(x => x.blocked.length > 0)
+    .sort((a,b) => b.blocked.length - a.blocked.length);
+  if (blockedInits.length) {
+    initInsights.push({t:'amber',
+      m:`<strong>${blockedInits.length} active initiative${blockedInits.length>1?'s have':' has'} blocked epics.</strong> ` +
+        blockedInits.slice(0,3).map(x=>`<strong>${x.name}</strong> (${x.blocked.length} blocked)`).join(', ') + '.',
+      label: 'Initiatives with blocked epics'});
+  }
+
+  // 3. Initiatives with low avg progress (<30%) but many epics in sprint
+  const lowProgress = active.filter(x => x.avg < 30 && x.inSprint.length >= 3)
+    .sort((a,b) => a.avg - b.avg);
+  if (lowProgress.length) {
+    initInsights.push({t:'amber',
+      m:`<strong>${lowProgress.length} initiative${lowProgress.length>1?'s are':' is'} in sprint with <30% avg progress.</strong> ` +
+        lowProgress.slice(0,3).map(x=>`<strong>${x.name}</strong> (${x.avg}%, ${x.inSprint.length} in sprint)`).join(', ') + '.',
+      label: 'Low progress in sprint'});
+  }
+
+  // 4. Initiatives near completion (avg ≥80%)
+  const nearDone = active.filter(x => x.avg >= 80)
+    .sort((a,b) => b.avg - a.avg);
+  if (nearDone.length) {
+    initInsights.push({t:'green',
+      m:`<strong>${nearDone.length} initiative${nearDone.length>1?'s are':' is'} at 80%+ avg progress.</strong> ` +
+        nearDone.slice(0,3).map(x=>`<strong>${x.name}</strong> (${x.avg}%)`).join(', ') +
+        ' — these may be close to delivery.',
+      label: 'Initiatives near completion'});
+  }
+
+  // 5. Large initiatives (5+ epics) with no sprint coverage
+  const noSprint = active.filter(x => {
+    const activeEpics = x.all.filter(d => ACTIVE_S2.has(d.Status));
+    return activeEpics.length >= 3 && x.inSprint.length === 0;
+  });
+  // (already filtered to inSprint > 0, so this won't appear — but kept for future use)
+
+  const initInsEl = document.getElementById('init-insights');
+  if (initInsEl && initInsights.length) {
+    initInsEl.innerHTML = `
+      <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Initiative insights</div>
+      ${initInsights.map(i => `
+        <div class="insight ${i.t}" style="margin-bottom:6px;font-size:12px">
+          ${i.m}
+        </div>`).join('')}`;
+  }
+}
+
+function toggleInitSection() {
+  const body = document.getElementById('init-body');
+  const btn  = document.getElementById('init-toggle-btn');
+  if (!body || !btn) return;
+  const collapsed = body.style.display === 'none';
+  body.style.display = collapsed ? 'block' : 'none';
+  btn.textContent = collapsed ? 'Hide ▲' : 'Show ▼';
 }
 renderInitiatives();
 showTable('stalled', document.querySelector('.tab.active'));
