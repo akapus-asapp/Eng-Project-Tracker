@@ -226,6 +226,13 @@
     </div>
   </div>
 
+  <div class="divider">Active Initiatives</div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">By Initiative <span style="font-size:10px;color:#aaa;font-weight:400">· only initiatives with epics in an active sprint · tap to drill down</span></div>
+    <div id="init-chart" style="margin-bottom:20px"></div>
+    <div id="init-table-wrap" style="display:none;margin-top:12px"></div>
+  </div>
+
   <div class="divider">Epics needing attention</div>
   <div class="card">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
@@ -269,7 +276,7 @@ function renderMetrics() {
   const blocked = DATA.filter(d => d.Status === 'Blocked');
   const highRisk = DATA.filter(d => (d.Risk||'').includes('High'));
   const inSprint = DATA.filter(d => (d['Active Sprint']||'').includes('Active'));
-  const done = DATA.filter(d => d.Status === 'Done');
+  const done = typeof COMPLETED_COUNT !== 'undefined' ? COMPLETED_COUNT : DATA.filter(d => d.Status === 'Done').length;
   const pctVals = active.map(d => d['Pct Done']).filter(v => v !== null);
   const avgPct = pctVals.length ? Math.round(pctVals.reduce((a,b)=>a+b,0)/pctVals.length) : 0;
 
@@ -286,8 +293,8 @@ function renderMetrics() {
      rows: inSprint.sort((a,b)=>(b['Pct Done']||0)-(a['Pct Done']||0)), sigFn: r=>`<span class="badge badge-green">${Math.round(r['Pct Done']||0)}% done</span>`},
     {l:'Avg progress', v: avgPct+'%',         c:'',      n:'across active epics',
      rows: active.filter(d=>d['Pct Done']!==null).sort((a,b)=>b['Pct Done']-a['Pct Done']), sigFn: r=>`<span class="badge badge-gray">${Math.round(r['Pct Done']||0)}% done</span>`},
-    {l:'Done',         v: done.length,        c:'green', n:'completed epics',
-     rows: done, sigFn: r=>`<span class="badge badge-green">✓ Done</span>`},
+    {l:'Done',         v: done,               c:'green', n:'completed epics',
+     rows: [], sigFn: r=>`<span class="badge badge-green">✓ Done</span>`},
   ];
 
   document.getElementById('metrics-grid').innerHTML = metrics.map((m,i) =>
@@ -1099,6 +1106,130 @@ renderExecChart();
 const activeForPeople = ['In Progress','Blocked','Pending Prod Deploy','Pending Sync','Unstarted','Backlog'];
 renderPersonChart('pm-chart', 'PM', activeForPeople);
 renderPersonChart('eng-chart', 'Eng Lead', activeForPeople);
+
+// ── Initiatives ──────────────────────────────────────────────────────────────
+function renderInitiatives() {
+  const ACTIVE_S = new Set(['In Progress','Blocked','Pending Prod Deploy','Pending Sync']);
+
+  // Build initiative map — only include named initiatives
+  const initMap = {};
+  DATA.forEach(d => {
+    const init = (d['Initiative'] || '').trim();
+    if (!init || init === '—') return;
+    if (!initMap[init]) initMap[init] = { all: [], inSprint: [], blocked: [], highRisk: [] };
+    initMap[init].all.push(d);
+    if ((d['Active Sprint']||'').includes('Active')) initMap[init].inSprint.push(d);
+    if (d.Status === 'Blocked') initMap[init].blocked.push(d);
+    if ((d.Risk||'').includes('High')) initMap[init].highRisk.push(d);
+  });
+
+  // Filter: only initiatives with at least 1 epic in active sprint
+  const active = Object.entries(initMap)
+    .filter(([,v]) => v.inSprint.length > 0)
+    .map(([name, v]) => {
+      const pcts = v.all.map(d => d['Pct Done']).filter(x => x !== null);
+      const avg  = pcts.length ? Math.round(pcts.reduce((a,b)=>a+b,0)/pcts.length) : 0;
+      return { name, all: v.all, inSprint: v.inSprint, blocked: v.blocked, highRisk: v.highRisk, avg };
+    })
+    .sort((a,b) => b.inSprint.length - a.inSprint.length);
+
+  const container = document.getElementById('init-chart');
+  const tableWrap  = document.getElementById('init-table-wrap');
+  if (!active.length) { container.innerHTML = '<p style="color:#aaa;font-size:13px">No active initiatives found.</p>'; return; }
+
+  let selectedInit = null;
+
+  function renderChart() {
+    const maxActive = Math.max(...active.map(x => x.inSprint.length));
+    container.innerHTML = active.map(({ name, all, inSprint, blocked, highRisk, avg }) => {
+      const barW   = Math.max(4, Math.round((inSprint.length / maxActive) * 100));
+      const riskDot = highRisk.length ? '<span style="color:#d9534f;font-weight:700;margin-left:4px">●</span>' : '';
+      const blkTag  = blocked.length  ? `<span style="background:#fde8e8;color:#d9534f;border-radius:3px;font-size:10px;padding:1px 5px;margin-left:4px">${blocked.length} blocked</span>` : '';
+      const isSelected = selectedInit === name;
+      return `
+        <div onclick="_initClick('${name.replace(/'/g,"\\'")}',this)"
+             style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;cursor:pointer;margin-bottom:2px;
+                    background:${isSelected ? '#EFF6FF' : 'transparent'};transition:background .15s">
+          <div style="width:200px;min-width:120px;font-size:12px;font-weight:600;color:#1e3a5f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0"
+               title="${name}">${name}${riskDot}</div>
+          <div style="flex:1;background:#e8f0fe;border-radius:4px;height:14px;min-width:60px">
+            <div style="height:14px;border-radius:4px;background:${avg >= 70 ? '#2ecc71' : avg >= 40 ? '#f39c12' : '#4a90d9'};width:${barW}%"></div>
+          </div>
+          <div style="width:28px;text-align:right;font-size:12px;font-weight:700;color:#333;flex-shrink:0">${inSprint.length}</div>
+          <div style="width:36px;text-align:right;font-size:11px;color:#888;flex-shrink:0">${avg}%</div>
+          ${blkTag}
+          <div style="width:40px;text-align:right;font-size:11px;color:#aaa;flex-shrink:0">${all.length} total</div>
+        </div>`;
+    }).join('');
+
+    // Legend
+    container.insertAdjacentHTML('beforeend', `
+      <div style="display:flex;gap:16px;margin-top:10px;font-size:10px;color:#aaa;padding-left:208px">
+        <span>bar = epics in sprint</span>
+        <span>number = count in sprint</span>
+        <span>% = avg progress (all epics)</span>
+        <span style="color:#d9534f">● = has high risk epics</span>
+      </div>`);
+  }
+
+  window._initClick = function(name, el) {
+    if (selectedInit === name) {
+      selectedInit = null;
+      tableWrap.style.display = 'none';
+      tableWrap.innerHTML = '';
+    } else {
+      selectedInit = name;
+      const { all, inSprint } = active.find(x => x.name === name) || {};
+      if (!all) return;
+
+      // Show epics for this initiative — active ones first
+      const sorted = [...all].sort((a,b) => {
+        const aActive = ACTIVE_S.has(a.Status) ? 0 : 1;
+        const bActive = ACTIVE_S.has(b.Status) ? 0 : 1;
+        return aActive - bActive || (b['Pct Done']||0) - (a['Pct Done']||0);
+      });
+
+      const rows = sorted.map(r => {
+        const sprint = (r['Active Sprint']||'').includes('Active')
+          ? '<span style="color:#27ae60;font-weight:700">🟢 In Sprint</span>'
+          : '<span style="color:#aaa">⚪ None</span>';
+        const statusColor = r.Status === 'Blocked' ? '#d9534f' : ACTIVE_S.has(r.Status) ? '#1e3a5f' : '#999';
+        const pct = r['Pct Done'] !== null ? r['Pct Done'] : '—';
+        const pctBar = r['Pct Done'] !== null
+          ? `<div style="background:#e8ecf0;border-radius:3px;height:8px;margin-top:3px"><div style="height:8px;border-radius:3px;background:${r['Pct Done']>=70?'#2ecc71':r['Pct Done']>=40?'#f39c12':'#4a90d9'};width:${r['Pct Done']}%"></div></div>`
+          : '';
+        const jiraUrl = 'https://asappinc.atlassian.net/browse/' + r['Key'];
+        return `<tr>
+          <td><a href="${jiraUrl}" target="_blank" style="color:#1a56db;font-weight:600;font-size:12px">${r['Key']}</a></td>
+          <td style="font-size:12px;max-width:280px">${r['Epic Name']}</td>
+          <td style="color:${statusColor};font-size:12px;font-weight:600">${r.Status}</td>
+          <td>${sprint}</td>
+          <td style="font-size:12px">${r['PM']||'—'}</td>
+          <td style="font-size:12px;min-width:90px">${typeof pct==='number' ? pct+'%' : '—'}${pctBar}</td>
+          <td style="font-size:12px;color:#888">${r['Target Date']||'—'}</td>
+        </tr>`;
+      }).join('');
+
+      tableWrap.style.display = 'block';
+      tableWrap.innerHTML = `
+        <div style="font-size:13px;font-weight:700;color:#1e3a5f;margin-bottom:8px">
+          ${name} <span style="font-weight:400;color:#888">· ${inSprint.length} in sprint · ${all.length} total epics</span>
+          <button onclick="document.getElementById('init-table-wrap').style.display='none';_initClick._sel=null"
+                  style="float:right;background:none;border:none;cursor:pointer;color:#888;font-size:16px">✕</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="epic-table">
+            <thead><tr><th>Key</th><th>Epic Name</th><th>Status</th><th>Sprint</th><th>PM</th><th>Progress</th><th>Target</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    }
+    renderChart();
+  };
+
+  renderChart();
+}
+renderInitiatives();
 showTable('stalled', document.querySelector('.tab.active'));
 showTrends('summary', document.querySelector('#trends-tab-bar .tab.active'));
 </script>
