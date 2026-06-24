@@ -215,6 +215,7 @@ body{background:#F4F5F7;font-family:'Public Sans',system-ui,sans-serif;color:#1F
       <div id="dr-rows"></div>
     </div>
     <div style="padding:14px 24px;border-top:1px solid #EEF0F3;display:flex;gap:10px">
+      <div data-act="exportDrawerCSV" style="display:flex;align-items:center;gap:7px;border:1px solid #E5E7EC;border-radius:8px;padding:10px 16px;font-size:12.5px;font-weight:600;cursor:pointer;color:#3A4351">&#8595; Export</div>
       <div data-act="closeDrawer" style="flex:1;text-align:center;background:#1F2733;color:#fff;border-radius:8px;padding:10px;font-size:12.5px;font-weight:600;cursor:pointer">Close</div>
     </div>
   </div>
@@ -559,11 +560,16 @@ function openDrawer(title,def,metricCol,rows){
   document.getElementById('dr-title').textContent=title;
   document.getElementById('dr-def').textContent=def;
   document.getElementById('dr-metric').textContent=metricCol;
-  const ST={ontrack:C.green,atrisk:C.amber,blocked:C.red};
+  window._drRows=rows; window._drTitle=title; window._drMetric=metricCol;
+  const JIRA='https://asappinc.atlassian.net/browse/';
   document.getElementById('dr-rows').innerHTML=rows.slice(0,50).map(r=>{
     const dot=r.statusColor||'#9aa2ae';
+    const isEpicKey=/^[A-Z]+-\d+$/.test(r.id);
+    const idEl = isEpicKey
+      ? '<a href="'+JIRA+r.id+'" target="_blank" class="mono" style="font-size:11px;color:#2F6BD8;text-decoration:none;font-weight:600">'+r.id+'</a>'
+      : '<div class="mono" style="font-size:11px;color:#A2AAB6">'+r.id+'</div>';
     return '<div style="display:grid;grid-template-columns:66px 1fr auto;gap:12px;padding:13px 24px;border-bottom:1px solid #F1F2F5;align-items:center">'+
-      '<div class="mono" style="font-size:11px;color:#A2AAB6">'+r.id+'</div>'+
+      idEl+
       '<div style="min-width:0"><div style="font-size:13px;font-weight:600;color:#2B333F;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+r.name+'</div>'+
       '<div style="display:flex;align-items:center;gap:8px;margin-top:4px"><span class="pill" style="font-size:10px;padding:2px 7px;background:'+dot+'18;color:'+dot+'"><span style="width:5px;height:5px;border-radius:50%;background:'+dot+';display:inline-block"></span>'+(r.status||'')+'</span><span style="font-size:11px;color:#A2AAB6">'+(r.owner||'')+'</span></div></div>'+
       '<div class="mono" style="font-size:13px;font-weight:600;color:#2B333F;text-align:right;white-space:nowrap">'+r.value+'</div></div>';
@@ -619,6 +625,19 @@ function exportCSV(){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='asapp_portfolio.csv';a.click();URL.revokeObjectURL(a.href);
 }
 
+function exportDrawerCSV(){
+  const rows=window._drRows;if(!rows||!rows.length)return;
+  const title=window._drTitle||'drill_down';
+  const metricCol=window._drMetric||'Value';
+  const cols=['ID','Item','Owner','Status',metricCol];
+  const csv=[cols.join(',')].concat(rows.map(r=>[r.id,r.name,r.owner||'',r.status||'',r.value||''].map(v=>'"'+((v||'').toString().replace(/"/g,'""'))+'"').join(','))).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=(title.replace(/[^a-zA-Z0-9_]/g,'_').toLowerCase()||'export')+'.csv';
+  a.click();URL.revokeObjectURL(a.href);
+}
+
 // ===== LEVEL SEGMENTED CONTROLS =====
 function renderSegs(){
   document.querySelectorAll('.level-seg').forEach(seg=>{
@@ -659,6 +678,7 @@ document.addEventListener('click', function(e){
     case 'switchTab': switchTab(arg, el); break;
     case 'setLevel': setLevel(arg); break;
     case 'exportCSV': exportCSV(); break;
+    case 'exportDrawerCSV': exportDrawerCSV(); break;
     case 'filterIns': filterIns(arg); break;
     case 'initStatus': initStatus(arg); break;
     case 'kpiDrill': kpiDrill(arg); break;
