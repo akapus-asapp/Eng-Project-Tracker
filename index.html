@@ -250,6 +250,21 @@ body{background:#F4F5F7;font-family:'Public Sans',system-ui,sans-serif;color:#1F
         <div id="trend-stale"></div>
       </section>
     </div>
+    <section class="card" style="padding:18px;margin-top:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div style="display:flex;align-items:center;gap:7px">
+          <div style="font-size:14px;font-weight:700">Velocity by team</div>
+          <span class="sec-tooltip">?<span class="sec-tooltip-box">For each team: Moving = epics active &lt;90 days in current status (still progressing). Stale = 90+ days without a status change. Blocked = status is Blocked. Click any bar to drill down.</span></span>
+        </div>
+        <div style="display:flex;gap:14px">
+          <div style="display:flex;align-items:center;gap:5px"><div style="width:9px;height:9px;border-radius:2px;background:#2E9E6B"></div><span style="font-size:11px;color:#5B6573">Moving</span></div>
+          <div style="display:flex;align-items:center;gap:5px"><div style="width:9px;height:9px;border-radius:2px;background:#DD9128"></div><span style="font-size:11px;color:#5B6573">Stale 90d+</span></div>
+          <div style="display:flex;align-items:center;gap:5px"><div style="width:9px;height:9px;border-radius:2px;background:#D14343"></div><span style="font-size:11px;color:#5B6573">Blocked</span></div>
+        </div>
+      </div>
+      <div style="font-size:11.5px;color:#8A93A2;margin-bottom:16px">Active <span class="tr-unit">epics</span> per team — moving vs. stale vs. blocked</div>
+      <div id="trend-team-velocity"></div>
+    </section>
   </div>
 
 </main>
@@ -798,6 +813,39 @@ function renderTrends(){
     '</div>'+
     '<div class="mono" style="font-size:12px;font-weight:600;color:#2B333F;width:26px;text-align:right">'+b.count+'</div></div>'
   ).join('');
+
+  // ---- Velocity by team ----
+  const tvTeams={};
+  active.forEach(d=>{
+    teamsOf(d).forEach(t=>{
+      if(!tvTeams[t])tvTeams[t]={moving:[],stale:[],blocked:[]};
+      if(d.Status==='Blocked') tvTeams[t].blocked.push(d);
+      else if((d['Days in Cur Status']||0)>=90) tvTeams[t].stale.push(d);
+      else tvTeams[t].moving.push(d);
+    });
+  });
+  const tvList=Object.entries(tvTeams)
+    .filter(([n])=>n&&n!=='\u2014'&&n!=='-')
+    .map(([name,v])=>({name,moving:v.moving,stale:v.stale,blocked:v.blocked,total:v.moving.length+v.stale.length+v.blocked.length}))
+    .sort((a,b)=>b.total-a.total)
+    .slice(0,12);
+  const tvMax=Math.max(1,...tvList.map(t=>t.total));
+  window._tvData=tvList;
+  document.getElementById('trend-team-velocity').innerHTML=tvList.map((t,i)=>{
+    const mPct=(t.moving.length/tvMax*100).toFixed(1);
+    const sPct=(t.stale.length/tvMax*100).toFixed(1);
+    const bPct=(t.blocked.length/tvMax*100).toFixed(1);
+    const iq=i; // index for drill
+    return '<div style="display:flex;align-items:center;gap:12px;margin-bottom:9px">'+
+      '<div style="font-size:12px;color:#3A4351;width:170px;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+t.name+'">'+t.name+'</div>'+
+      '<div style="flex:1;height:18px;border-radius:4px;overflow:hidden;display:flex;background:#F0F1F4;min-width:0">'+
+        (t.moving.length?'<div style="width:'+mPct+'%;background:'+C.green+';height:100%;cursor:pointer" data-act="tvDrill" data-arg="'+iq+'\u001fmoving" title="Moving: '+t.moving.length+'"></div>':'')+
+        (t.stale.length?'<div style="width:'+sPct+'%;background:'+C.amber+';height:100%;cursor:pointer" data-act="tvDrill" data-arg="'+iq+'\u001fstale" title="Stale 90d+: '+t.stale.length+'"></div>':'')+
+        (t.blocked.length?'<div style="width:'+bPct+'%;background:'+C.red+';height:100%;cursor:pointer" data-act="tvDrill" data-arg="'+iq+'\u001fblocked" title="Blocked: '+t.blocked.length+'"></div>':'')+
+      '</div>'+
+      '<div class="mono" style="font-size:11.5px;font-weight:600;color:#2F6BD8;text-decoration:underline;width:28px;text-align:right;cursor:pointer;flex-shrink:0" data-act="tvDrill" data-arg="'+iq+'\u001fall">'+t.total+'</div>'+
+    '</div>';
+  }).join('');
 }
 function trendDrill(i){const c=window._trendCards?.[parseInt(i)];if(c&&c.drill)c.drill();}
 function trendVeloDrill(i){
@@ -810,6 +858,31 @@ function trendVeloDrill(i){
     lv==='initiatives'
       ? w.rows.map(it=>({...initToRow(it),value:it.active.length+' active'}))
       : w.rows.map(d=>({...epicToRow(d),value:(d['Days in Execution']||0)+'d'}))
+  );
+}
+function tvDrill(arg){
+  const parts=arg.split('\u001f');
+  const t=window._tvData?.[parseInt(parts[0])];
+  const cat=parts[1]||'all';
+  if(!t)return;
+  const catLabels={moving:'Moving',stale:'Stale 90d+',blocked:'Blocked',all:'All'};
+  let rows;
+  if(cat==='moving') rows=t.moving;
+  else if(cat==='stale') rows=t.stale;
+  else if(cat==='blocked') rows=t.blocked;
+  else rows=[...t.moving,...t.stale,...t.blocked];
+  if(!rows.length)return;
+  const metric=cat==='stale'?'Days in status':cat==='blocked'?'Days blocked':'Days exec';
+  openDrawer(
+    t.name+' \u00b7 '+catLabels[cat],
+    rows.length+' active epics for this team.',
+    metric,
+    rows.map(d=>({
+      ...epicToRow(d),
+      value: cat==='stale'||cat==='all' ? (d['Days in Cur Status']||0)+'d'
+           : cat==='blocked' ? (d['Days in Cur Status']||0)+'d'
+           : (d['Days in Execution']||0)+'d'
+    }))
   );
 }
 
@@ -1025,6 +1098,11 @@ document.addEventListener('click', function(e){
     case 'teamDrill': teamDrill(arg); break;
     case 'trendDrill': trendDrill(arg); break;
     case 'trendVeloDrill': trendVeloDrill(arg); break;
+    case 'tvDrill': {
+      const sep=arg.indexOf('\u001f');
+      tvDrill(sep>=0?arg:arg+'\u001fall');
+      break;
+    }
     case 'analyticsDrill': {
       const sep=arg.indexOf('\u001f');
       if(sep>=0){
