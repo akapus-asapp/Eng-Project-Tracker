@@ -7,7 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#F4F5F7;font-family:'Public Sans',system-ui,sans-serif;color:#1F2733;-webkit-font-smoothing:antialiased;font-size:14px}
@@ -1026,7 +1025,7 @@ function showEpicsTab(type, btn) {
         const sprint=(r['Active Sprint']||'').includes('Active')?'<span style="color:#2E9E6B;font-weight:700">In sprint</span>':'<span style="color:#ccc">--</span>';
         const pct=r['Pct Done']!==null?r['Pct Done']:0;
         return `<tr>
-          <td><a href="${JIRA}${r.Key}" target="_blank" style="color:#1a56db;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600">${r.Key}</a></td>
+          <td><span onclick="window.open('${JIRA}${r.Key}','_blank')" style="color:#1a56db;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;cursor:pointer">${r.Key}</span></td>
           <td style="max-width:260px"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r['Epic Name']}</div></td>
           <td><span class="status-pill" style="font-size:10.5px;background:${dc}18;color:${dc}"><span style="width:5px;height:5px;border-radius:50%;background:${dc};display:inline-block;margin-right:4px"></span>${r.Status}</span></td>
           <td style="text-align:center">${sprint}</td>
@@ -1046,19 +1045,23 @@ function exportEpicsCSV(rows, title) {
   if (!rows || !rows.length) return;
   const cols = ['Key','Epic Name','Status','Active Sprint','PM','Eng Lead','Pct Done','Target Date','Initiative','Risk'];
   const csv = [cols.join(','), ...rows.map(r=>cols.map(c=>`"${(r[c]||'').toString().replace(/"/g,'""')}"`).join(','))].join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
   const a=document.createElement('a');
-  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.href=URL.createObjectURL(blob);
   a.download=`epics_${title.toLowerCase().replace(/\s+/g,'_')}.csv`;
   a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function exportAllCSV() {
   const cols=['Key','Epic Name','Status','Initiative','Priority','Active Sprint','Pct Done','Contributing Teams','Eng Lead','PM','Target Date','Risk','Days in Execution','Days Since Created','Days in Cur Status','Last Updated'];
   const csv=[cols.join(','),...DATA.map(r=>cols.map(c=>`"${(r[c]||'').toString().replace(/"/g,'""')}"`).join(','))].join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
   const a=document.createElement('a');
-  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.href=URL.createObjectURL(blob);
   a.download='asapp_portfolio.csv';
   a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 // == INIT ==
