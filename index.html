@@ -423,55 +423,39 @@ a{color:inherit;text-decoration:none}
 </div>
 
 <script>
-
 (function() {
   const now = new Date();
-
-  // Today
   const todayStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-  // Data age — parse from header-sub text
-  const subEl = document.getElementById('header-sub');
-  let dataAgeLabel = '—';
-  let ageClass = 'hsbadge-age-ok';
-  if (subEl) {
-    const subText = subEl.textContent || '';
-    // Try to extract date from "data from Jun 16, 2026, ..."
-    const m = subText.match(/data from ([A-Z][a-z]+ \d+, \d+)/);
+  const todayEl = document.getElementById('header-today');
+  if (todayEl) todayEl.textContent = todayStr;
+
+  // Data age from HEADER_SUB (set after DATA injection) or header-sub text
+  const ageEl = document.getElementById('header-age-chip');
+  function updateAge() {
+    let label = '—';
+    const src = (typeof HEADER_SUB !== 'undefined' ? HEADER_SUB : (document.getElementById('header-sub')||{}).textContent) || '';
+    const m = src.match(/data from ([A-Z][a-z]+ \d+, \d+)/);
     if (m) {
       const dataDate = new Date(m[1]);
       if (!isNaN(dataDate)) {
-        const ageDays = Math.floor((now - dataDate) / (1000 * 60 * 60 * 24));
-        if (ageDays === 0) { dataAgeLabel = 'Fresh today'; ageClass = 'hsbadge-age-ok'; }
-        else if (ageDays === 1) { dataAgeLabel = '1 day old'; ageClass = 'hsbadge-age-ok'; }
-        else if (ageDays <= 7) { dataAgeLabel = ageDays + ' days old'; ageClass = 'hsbadge-age-warn'; }
-        else { dataAgeLabel = ageDays + ' days old'; ageClass = 'hsbadge-age-old'; }
+        const ageDays = Math.floor((now - dataDate) / 86400000);
+        if (ageDays <= 0) label = 'Fresh today';
+        else if (ageDays === 1) label = '1 day old';
+        else label = ageDays + ' days old';
       }
     }
+    if (ageEl) ageEl.textContent = 'Data age: ' + label;
   }
+  updateAge();
 
-  // Next refresh — next Monday
   const daysUntilMonday = (8 - now.getDay()) % 7 || 7;
   const nextMonday = new Date(now);
   nextMonday.setDate(now.getDate() + daysUntilMonday);
   const nextStr = nextMonday.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-
-  const panel = document.getElementById('header-status-panel');
-  panel.innerHTML =
-    '<div class="header-status-row">' +
-      '<span class="header-status-label">Today</span>' +
-      '<span class="header-status-value hsbadge-today">&#128197; ' + todayStr + '</span>' +
-    '</div>' +
-    '<div class="header-status-row">' +
-      '<span class="header-status-label">Data age</span>' +
-      '<span class="header-status-value ' + ageClass + '">' + dataAgeLabel + '</span>' +
-    '</div>' +
-    '<div class="header-status-row">' +
-      '<span class="header-status-label">Next refresh</span>' +
-      '<span class="header-status-value hsbadge-next">&#128260; ' + nextStr + '</span>' +
-    '</div>';
+  const nextEl = document.getElementById('header-next');
+  if (nextEl) nextEl.textContent = 'Next refresh: ' + nextStr;
 })();
-
 </script>
 
 <script>
@@ -1082,8 +1066,17 @@ renderAnalytics();
 renderTrends();
 renderEpicsTab();
 
-// Update header sub
-document.getElementById('header-sub').textContent = DATA.length + ' epics';
+// Update header sub + age chip (now that HEADER_SUB and DATA exist)
+document.getElementById('header-sub').textContent = (typeof HEADER_SUB !== 'undefined' ? HEADER_SUB : DATA.length + ' epics');
+(function(){
+  const now = new Date();
+  const ageEl = document.getElementById('header-age-chip');
+  const src = (typeof HEADER_SUB !== 'undefined' ? HEADER_SUB : '') || '';
+  const m = src.match(/data from ([A-Z][a-z]+ \d+, \d+)/);
+  let label = '—';
+  if (m) { const d = new Date(m[1]); if (!isNaN(d)) { const a = Math.floor((now-d)/86400000); label = a<=0?'Fresh today':a===1?'1 day old':a+' days old'; } }
+  if (ageEl) ageEl.textContent = 'Data age: ' + label;
+})();
 </script>
 </body>
 </html>
