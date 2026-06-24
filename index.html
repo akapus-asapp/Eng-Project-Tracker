@@ -141,7 +141,6 @@ body{background:#F4F5F7;font-family:'Public Sans',system-ui,sans-serif;color:#1F
 
   <!-- INITIATIVES -->
   <div class="panel" id="panel-initiatives">
-    <div style="display:flex;align-items:center;gap:9px;margin-bottom:18px;flex-wrap:wrap" id="init-status-chips"></div>
 
     <div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start">
       <div style="display:flex;flex-direction:column;gap:20px">
@@ -166,10 +165,11 @@ body{background:#F4F5F7;font-family:'Public Sans',system-ui,sans-serif;color:#1F
           <div id="init-risk-chart" style="display:flex;flex-direction:column;gap:7px"></div>
         </section>
 
-        <!-- Initiative table -->
+        <!-- Status filter chips + table -->
         <section class="card" style="overflow:hidden">
-          <div style="display:grid;grid-template-columns:62px 1fr 92px 104px 50px 116px 84px;gap:12px;padding:11px 18px;border-bottom:1px solid #EEF0F3;background:#FAFBFC;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#9aa2ae">
-            <div>ID</div><div>Initiative</div><div>Team</div><div>Status</div><div style="text-align:right">Epics</div><div>Progress</div><div style="text-align:right">Active</div>
+          <div style="display:flex;align-items:center;gap:9px;padding:14px 18px;border-bottom:1px solid #EEF0F3;flex-wrap:wrap" id="init-status-chips"></div>
+          <div style="display:grid;grid-template-columns:52px 1fr 90px 100px 46px 120px 80px 72px;gap:12px;padding:11px 18px;border-bottom:1px solid #EEF0F3;background:#FAFBFC;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#9aa2ae">
+            <div>ID</div><div>Initiative</div><div>Team</div><div>Status</div><div style="text-align:right">Epics</div><div>Progress</div><div style="text-align:right">Active</div><div style="text-align:right">Due</div>
           </div>
           <div id="init-tbody"></div>
         </section>
@@ -231,10 +231,25 @@ body{background:#F4F5F7;font-family:'Public Sans',system-ui,sans-serif;color:#1F
     </div>
     <div id="trend-cards" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px"></div>
     <section class="card" style="padding:18px">
-      <div style="font-size:14px;font-weight:700;margin-bottom:4px">Delivery momentum</div>
-      <div style="font-size:11.5px;color:#8A93A2;margin-bottom:8px"><span class="tr-unit">epics</span> started vs. completed per cycle</div>
-      <div id="trend-note"></div>
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">
+        <div style="font-size:14px;font-weight:700">Execution velocity</div>
+        <span class="sec-tooltip">?<span class="sec-tooltip-box">Shows how many epics entered execution (Days in Execution &gt; 0) within each time window, vs. how many have been in their current status for a long time (stale). Based on current snapshot — not historical data.</span></span>
+      </div>
+      <div style="font-size:11.5px;color:#8A93A2;margin-bottom:18px"><span class="tr-unit">Epics</span> by time in execution &amp; status age — current snapshot</div>
+      <div id="trend-velocity"></div>
     </section>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+      <section class="card" style="padding:18px">
+        <div style="font-size:14px;font-weight:700;margin-bottom:4px">Recently started</div>
+        <div style="font-size:11.5px;color:#8A93A2;margin-bottom:16px">Active <span class="tr-unit">epics</span> by when they entered execution</div>
+        <div id="trend-started"></div>
+      </section>
+      <section class="card" style="padding:18px">
+        <div style="font-size:14px;font-weight:700;margin-bottom:4px">Status age distribution</div>
+        <div style="font-size:11.5px;color:#8A93A2;margin-bottom:16px">How long active <span class="tr-unit">epics</span> have been in their current status</div>
+        <div id="trend-stale"></div>
+      </section>
+    </div>
   </div>
 
 </main>
@@ -593,7 +608,13 @@ function renderInitTab(){
   document.getElementById('init-tbody').innerHTML=list.map((it,i)=>{
     const st=ST[it.status];
     const team=it.teams.slice(0,2).join(', ')+(it.teams.length>2?' +'+(it.teams.length-2):'');
-    return '<div class="ins-row" style="display:grid;grid-template-columns:62px 1fr 92px 104px 50px 116px 84px;gap:12px;padding:12px 18px;align-items:center" data-act="initDrill" data-arg="'+INITS.indexOf(it)+'">'+
+    // Nearest due date among active epics with a target date
+    const dates=it.epics.filter(d=>d['Target Date']&&d['Target Date']!=='-'&&d['Target Date']!=='\u2014').map(d=>new Date(d['Target Date'])).filter(d=>!isNaN(d)).sort((a,b)=>a-b);
+    const nearestDate=dates[0]||null;
+    const isOverdue=nearestDate&&nearestDate<today;
+    const dueTxt=nearestDate?nearestDate.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}):'\u2014';
+    const dueColor=isOverdue?C.red:'#8A93A2';
+    return '<div class="ins-row" style="display:grid;grid-template-columns:52px 1fr 90px 100px 46px 120px 80px 72px;gap:12px;padding:12px 18px;align-items:center" data-act="initDrill" data-arg="'+INITS.indexOf(it)+'">'+
       '<div class="mono" style="font-size:11px;color:#A2AAB6">#'+(i+1)+'</div>'+
       '<div style="min-width:0"><div style="font-size:13px;font-weight:600;color:#2B333F;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+it.name+'</div><div style="font-size:11px;color:#A2AAB6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(it.pms.slice(0,2).join(', ')||'\u2014')+'</div></div>'+
       '<div style="font-size:11.5px;color:#5B6573;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+team+'">'+(team||'\u2014')+'</div>'+
@@ -604,7 +625,8 @@ function renderInitTab(){
         '<div class="mono" style="font-size:11px;color:#5B6573;width:30px;text-align:right">'+it.avg+'%</div>'+
         '<span class="kpi-tooltip" style="width:13px;height:13px;font-size:8px">?<span class="kpi-tooltip-box" style="width:210px">'+progTip+'</span></span>'+
       '</div>'+
-      '<div class="mono" style="font-size:11px;text-align:right;color:#8A93A2">'+it.active.length+'</div></div>';
+      '<div class="mono" style="font-size:11px;text-align:right;color:#8A93A2">'+it.active.length+'</div>'+
+      '<div class="mono" style="font-size:11px;text-align:right;color:'+dueColor+';font-weight:'+(isOverdue?'700':'400')+'">'+dueTxt+'</div></div>';
   }).join('');
 
   // b. Active by initiative — clickable rows
@@ -639,14 +661,18 @@ function renderAnalytics(){
   document.getElementById('rbt').innerHTML=teams.map(([n,v])=>{
     const g=sc(v.g),a=sc(v.a),r=sc(v.r),tot=g+a+r;
     const nq=n.replace(/"/g,'&quot;');
-    return '<div style="display:flex;align-items:center;gap:12px;cursor:pointer" data-act="analyticsDrill" data-arg="team||'+nq+'||all">'+
+    const seg=(val,color,cat,label)=>val?
+      '<div style="height:100%;background:'+color+';width:'+(val/tMax*100).toFixed(1)+'%;cursor:pointer;flex-shrink:0" '+
+      'data-act="analyticsDrill" data-arg="team\u001f'+nq+'\u001f'+cat+'" title="'+label+': '+val+'"></div>':'';
+    return '<div style="display:flex;align-items:center;gap:12px">'+
       '<div style="font-size:12px;color:#3A4351;width:150px;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+n+'">'+n+'</div>'+
       '<div style="flex:1;height:16px;border-radius:4px;overflow:hidden;display:flex;background:#F0F1F4">'+
-        '<div style="width:'+(g/tMax*100)+'%;background:'+C.green+'" title="On track: '+g+'"></div>'+
-        '<div style="width:'+(a/tMax*100)+'%;background:'+C.amber+'" title="At risk: '+a+'"></div>'+
-        '<div style="width:'+(r/tMax*100)+'%;background:'+C.red+'" title="Blocked: '+r+'"></div>'+
+        seg(g,C.green,'g','On track')+
+        seg(a,C.amber,'a','At risk')+
+        seg(r,C.red,'r','Blocked')+
       '</div>'+
-      '<div class="mono" style="font-size:11.5px;font-weight:600;color:#2F6BD8;text-decoration:underline;width:26px;text-align:right">'+tot+'</div></div>';
+      '<div class="mono" style="font-size:11.5px;font-weight:600;color:#2F6BD8;text-decoration:underline;width:26px;text-align:right;cursor:pointer" '+
+      'data-act="analyticsDrill" data-arg="team\u001f'+nq+'\u001fall">'+tot+'</div></div>';
   }).join('');
   document.querySelectorAll('.an-unit').forEach(e=>e.textContent='active '+unit());
   // By priority
@@ -688,8 +714,9 @@ function renderAnalytics(){
   document.getElementById('byel').innerHTML=elL.map(([n,v])=>{const vv=sc(v);const nq=n.replace(/"/g,'&quot;');return '<div style="display:flex;align-items:center;gap:12px;cursor:pointer" data-act="analyticsDrill" data-arg="eng||'+nq+'"><div style="font-size:12px;color:#3A4351;width:120px;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+n+'</div><div style="flex:1;height:13px;background:#F0F1F4;border-radius:4px;overflow:hidden"><div style="width:'+(vv/elMax*100)+'%;height:100%;background:#4A6FA5;border-radius:4px"></div></div><div class="mono" style="font-size:11.5px;font-weight:600;color:#2F6BD8;text-decoration:underline;width:24px;text-align:right">'+vv+'</div></div>';}).join('');
 }
 
-// ===== TRENDS (snapshot KPIs) =====
+// ===== TRENDS (snapshot KPIs + execution velocity) =====
 function renderTrends(){
+  const src = state.level==='initiatives' ? INITS : null;
   const cards = state.level==='initiatives' ? [
     {label:'Active initiatives',value:INITS.filter(i=>i.active.length>0).length,sub:'with epics in execution',color:C.blue,drill:()=>openDrawer('Active initiatives','Initiatives with at least one epic in execution.','Progress',INITS.filter(i=>i.active.length>0).map(initToRow))},
     {label:'Blocked initiatives',value:INITS.filter(i=>i.blocked.length>0).length,sub:'have blocked epics',color:C.red,drill:()=>openDrawer('Blocked initiatives','Initiatives with at least one Blocked epic.','Blocked',INITS.filter(i=>i.blocked.length>0).map(initToRow))},
@@ -709,9 +736,82 @@ function renderTrends(){
     '<div style="font-size:11px;color:#9aa2ae">'+c.sub+'</div></div>'
   ).join('');
   document.querySelectorAll('.tr-unit').forEach(e=>e.textContent=unit());
-  document.getElementById('trend-note').innerHTML='<p style="color:#9aa2ae;font-size:13px;padding:8px 0">Run <strong>Weekly Snapshot</strong> from the Apps Script menu to populate historical trend lines.</p>';
+
+  // ---- Execution velocity (main bar chart) ----
+  const windows=[
+    {label:'< 7d',   lo:0,  hi:7,   color:C.green},
+    {label:'7-30d',  lo:7,  hi:30,  color:'#5BA3C9'},
+    {label:'30-90d', lo:30, hi:90,  color:C.blue},
+    {label:'90-180d',lo:90, hi:180, color:C.amber},
+    {label:'180d+',  lo:180,hi:9999,color:C.red},
+  ];
+  const veloData = state.level==='initiatives'
+    ? windows.map(w=>({...w, rows:INITS.filter(i=>i.active.length>0&&(()=>{const days=i.active.map(e=>e['Days in Execution']||0);const avg=days.reduce((a,b)=>a+b,0)/days.length;return avg>=w.lo&&avg<w.hi;})())}))
+    : windows.map(w=>({...w, rows:active.filter(d=>{const x=d['Days in Execution']||0;return x>=w.lo&&x<w.hi;})}));
+  const vMax=Math.max(1,...veloData.map(w=>w.rows.length));
+  document.getElementById('trend-velocity').innerHTML=veloData.map((w,i)=>
+    '<div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;cursor:pointer" data-act="trendVeloDrill" data-arg="'+i+'">'+
+    '<div style="font-size:12px;color:#3A4351;width:70px;flex:0 0 auto;font-family:\'IBM Plex Mono\',monospace">'+w.label+'</div>'+
+    '<div style="flex:1;height:20px;background:#F0F1F4;border-radius:4px;overflow:hidden">'+
+      '<div style="width:'+(w.rows.length/vMax*100)+'%;height:100%;background:'+w.color+';border-radius:4px;cursor:pointer"></div>'+
+    '</div>'+
+    '<div class="mono" style="font-size:12px;font-weight:600;color:#2F6BD8;text-decoration:underline;width:28px;text-align:right">'+w.rows.length+'</div></div>'
+  ).join('');
+  window._veloData=veloData;
+
+  // ---- Recently started (last 30/60/90d) ----
+  const startBuckets=[
+    {label:'< 30 days',  fn:d=>(d['Days in Execution']||0)>0&&(d['Days in Execution']||0)<=30, color:C.green},
+    {label:'30-60 days', fn:d=>{const x=d['Days in Execution']||0;return x>30&&x<=60;},         color:'#5BA3C9'},
+    {label:'60-90 days', fn:d=>{const x=d['Days in Execution']||0;return x>60&&x<=90;},         color:C.blue},
+    {label:'90+ days',   fn:d=>(d['Days in Execution']||0)>90,                                    color:C.amber},
+  ];
+  const sbSrc = state.level==='initiatives'
+    ? startBuckets.map(b=>({...b,count:INITS.filter(i=>i.active.length>0&&b.fn(i.active[0]||{})).length}))
+    : startBuckets.map(b=>({...b,count:active.filter(b.fn).length}));
+  const sbMax=Math.max(1,...sbSrc.map(b=>b.count));
+  document.getElementById('trend-started').innerHTML=sbSrc.map(b=>
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">'+
+    '<div style="font-size:12px;color:#3A4351;width:80px;flex:0 0 auto">'+b.label+'</div>'+
+    '<div style="flex:1;height:14px;background:#F0F1F4;border-radius:4px;overflow:hidden">'+
+      '<div style="width:'+(b.count/sbMax*100)+'%;height:100%;background:'+b.color+';border-radius:4px"></div>'+
+    '</div>'+
+    '<div class="mono" style="font-size:12px;font-weight:600;color:#2B333F;width:26px;text-align:right">'+b.count+'</div></div>'
+  ).join('');
+
+  // ---- Status age (how long in current status) ----
+  const staleBuckets=[
+    {label:'< 7 days',   fn:d=>(d['Days in Cur Status']||0)<=7,                                   color:C.green},
+    {label:'7-30 days',  fn:d=>{const x=d['Days in Cur Status']||0;return x>7&&x<=30;},           color:'#5BA3C9'},
+    {label:'30-90 days', fn:d=>{const x=d['Days in Cur Status']||0;return x>30&&x<=90;},          color:C.amber},
+    {label:'90+ days',   fn:d=>(d['Days in Cur Status']||0)>90,                                    color:C.red},
+  ];
+  const staleSrc = state.level==='initiatives'
+    ? staleBuckets.map(b=>({...b,count:INITS.filter(i=>i.active.some(e=>b.fn(e))).length}))
+    : staleBuckets.map(b=>({...b,count:active.filter(b.fn).length}));
+  const stMax=Math.max(1,...staleSrc.map(b=>b.count));
+  document.getElementById('trend-stale').innerHTML=staleSrc.map(b=>
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">'+
+    '<div style="font-size:12px;color:#3A4351;width:80px;flex:0 0 auto">'+b.label+'</div>'+
+    '<div style="flex:1;height:14px;background:#F0F1F4;border-radius:4px;overflow:hidden">'+
+      '<div style="width:'+(b.count/stMax*100)+'%;height:100%;background:'+b.color+';border-radius:4px"></div>'+
+    '</div>'+
+    '<div class="mono" style="font-size:12px;font-weight:600;color:#2B333F;width:26px;text-align:right">'+b.count+'</div></div>'
+  ).join('');
 }
 function trendDrill(i){const c=window._trendCards?.[parseInt(i)];if(c&&c.drill)c.drill();}
+function trendVeloDrill(i){
+  const w=window._veloData?.[parseInt(i)];if(!w||!w.rows.length)return;
+  const lv=state.level;
+  openDrawer(
+    'Execution: '+w.label,
+    (lv==='initiatives'?'Initiatives':'Epics')+' in execution for '+w.label+'.',
+    lv==='initiatives'?'Active epics':'Days exec',
+    lv==='initiatives'
+      ? w.rows.map(it=>({...initToRow(it),value:it.active.length+' active'}))
+      : w.rows.map(d=>({...epicToRow(d),value:(d['Days in Execution']||0)+'d'}))
+  );
+}
 
 // ===== DRAWER =====
 function openDrawer(title,def,metricCol,rows){
@@ -811,12 +911,22 @@ function teamDrill(team){
 function analyticsDrill(type,arg){
   let rows=[], title='', def='', metric='Progress';
   if(type==='team'){
-    const [team,cat]=arg.split('||');
-    if(cat==='g') rows=active.filter(d=>teamsOf(d).includes(team)&&d.Status!=='Blocked'&&!isHighRisk(d));
-    else if(cat==='a') rows=active.filter(d=>teamsOf(d).includes(team)&&isHighRisk(d)&&d.Status!=='Blocked');
-    else rows=active.filter(d=>teamsOf(d).includes(team)&&d.Status==='Blocked');
-    title='Risk: '+team+' \u00b7 '+(cat==='g'?'On track':cat==='a'?'At risk':'Blocked');
-    def=rows.length+' active epics in this risk category for this team.';
+    const parts=arg.split('\u001f');
+    const team=parts[0], cat=parts[1]||'all';
+    const teamEpics=active.filter(d=>teamsOf(d).includes(team));
+    if(cat==='g'){
+      rows=teamEpics.filter(d=>d.Status!=='Blocked'&&!isHighRisk(d));
+      title=team+' \u00b7 On track'; def=rows.length+' epics on track for this team.';
+    } else if(cat==='a'){
+      rows=teamEpics.filter(d=>isHighRisk(d)&&d.Status!=='Blocked');
+      title=team+' \u00b7 At risk'; def=rows.length+' high-risk epics for this team.';
+    } else if(cat==='r'){
+      rows=teamEpics.filter(d=>d.Status==='Blocked');
+      title=team+' \u00b7 Blocked'; def=rows.length+' blocked epics for this team.';
+    } else {
+      rows=teamEpics;
+      title=team; def=rows.length+' active epics contributing this team.';
+    }
     metric='% Done';
   } else if(type==='priority'){
     rows=active.filter(d=>(d.Priority||'\u2014')===arg);
@@ -914,9 +1024,15 @@ document.addEventListener('click', function(e){
     case 'healthDrill': healthDrill(arg); break;
     case 'teamDrill': teamDrill(arg); break;
     case 'trendDrill': trendDrill(arg); break;
+    case 'trendVeloDrill': trendVeloDrill(arg); break;
     case 'analyticsDrill': {
-      const parts=arg.split('||');
-      analyticsDrill(parts[0], parts.slice(1).join('||'));
+      const sep=arg.indexOf('\u001f');
+      if(sep>=0){
+        analyticsDrill(arg.slice(0,sep), arg.slice(sep+1));
+      } else {
+        const parts=arg.split('||');
+        analyticsDrill(parts[0], parts.slice(1).join('||'));
+      }
       break;
     }
     case 'closeDrawer': closeDrawer(); break;
