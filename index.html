@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Initiatives Control Board</title>
+<title>ASAPP Engineering Pulse</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -34,6 +34,10 @@ body{background:#F4F5F7;font-family:'Public Sans',system-ui,sans-serif;color:#1F
 .kpilabel{font-size:10.5px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#8A93A2;margin-bottom:9px}
 .kpival{font-size:29px;font-weight:600;letter-spacing:-0.02em;line-height:1}
 .kpisub{font-size:11px;color:#9aa2ae;margin-top:7px}
+.kpi-tooltip{position:relative;display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:#E8EAED;color:#8A93A2;font-size:9px;font-weight:700;cursor:default;flex:0 0 auto}
+.kpi-tooltip:hover .kpi-tooltip-box{display:block}
+.kpi-tooltip-box{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);width:220px;background:#1F2733;color:#E8EAED;font-size:11px;font-weight:400;line-height:1.5;padding:10px 12px;border-radius:8px;z-index:100;box-shadow:0 4px 16px rgba(20,28,40,0.25);pointer-events:none}
+.kpi-tooltip-box::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#1F2733}
 .ovgrid{display:grid;grid-template-columns:1.55fr 1fr;gap:20px}
 .ichip{font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:7px;cursor:pointer;border:none}
 .ins-row{display:flex;gap:13px;padding:13px 18px;border-bottom:1px solid #F1F2F5;align-items:flex-start;cursor:pointer}
@@ -56,7 +60,7 @@ body{background:#F4F5F7;font-family:'Public Sans',system-ui,sans-serif;color:#1F
     <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0">
       <div class="hdr-logo"><div style="width:13px;height:13px;border:2px solid #fff;border-radius:3px"></div></div>
       <div style="min-width:0">
-        <div style="font-size:15px;font-weight:700;letter-spacing:-0.01em;line-height:1.1">Initiatives Control Board</div>
+        <div style="font-size:15px;font-weight:700;letter-spacing:-0.01em;line-height:1.1">ASAPP Engineering Pulse</div>
         <div id="hdr-sub" style="font-size:11.5px;color:#8A93A2;line-height:1.3">Portfolio delivery health &amp; execution risk</div>
       </div>
     </div>
@@ -252,7 +256,7 @@ function inSprint(d){return (d['Active Sprint']||'').includes('Active');}
 function isHighRisk(d){return (d.Risk||'').includes('High');}
 function pct(d){return d['Pct Done']!==null && d['Pct Done']!==undefined ? d['Pct Done'] : null;}
 function overdueDays(d){ if(!d['Target Date']||d['Target Date']==='-'||d['Target Date']==='\u2014')return null; const t=new Date(d['Target Date']); if(isNaN(t))return null; const diff=Math.floor((today-t)/86400000); return diff; }
-function teamsOf(d){return (d['Contributing Teams']||'').split(';').map(t=>t.trim()).filter(Boolean);}
+function teamsOf(d){return (d['Contributing Teams']||'').split(';').map(t=>t.trim()).filter(t=>t&&t!=='\u2014'&&t!=='-');}
 
 const active = DATA.filter(isActive);
 const blocked = DATA.filter(d=>d.Status==='Blocked');
@@ -309,12 +313,18 @@ function computeKPIs(){
     const due=INITS.filter(i=>i.epics.some(d=>{const o=overdueDays(d);return o!==null&&o<0&&o>=-30;})).length;
     const avgAll=INITS.length?Math.round(INITS.reduce((s,i)=>s+i.avg,0)/INITS.length):0;
     return [
-      {label:'Total Initiatives',value:tot,bar:'#D7DCE3',sub:'across all portfolios',drill:'kpi-total'},
-      {label:'Active',value:act,bar:C.blue,sub:'with epics in execution',drill:'kpi-active'},
-      {label:'Blocked',value:blk,bar:C.red,sub:'have blocked epics',drill:'kpi-blocked'},
-      {label:'Overdue',value:ovd,bar:C.red,sub:'have overdue epics',drill:'kpi-overdue'},
-      {label:'Due Soon',value:due,bar:C.amber,sub:'epics due in 30 days',drill:'kpi-duesoon'},
-      {label:'Avg Progress',value:avgAll+'%',bar:C.green,sub:'across initiatives',drill:'kpi-avg'},
+      {label:'Total Initiatives',value:tot,bar:'#D7DCE3',sub:'across all portfolios',drill:'kpi-total',
+       tip:'All distinct initiatives found in the Stakeholder View sheet, regardless of status.'},
+      {label:'Active',value:act,bar:C.blue,sub:'with epics in execution',drill:'kpi-active',
+       tip:'Initiatives that have at least one epic with status In Progress, Blocked, Pending Prod Deploy, or Pending Sync.'},
+      {label:'Blocked',value:blk,bar:C.red,sub:'have blocked epics',drill:'kpi-blocked',
+       tip:'Initiatives where at least one epic has status Blocked. The initiative is flagged even if only one of its epics is blocked.'},
+      {label:'Overdue',value:ovd,bar:C.red,sub:'have overdue epics',drill:'kpi-overdue',
+       tip:'Initiatives that contain at least one active epic whose Target Date is in the past.'},
+      {label:'Due Soon',value:due,bar:C.amber,sub:'epics due in 30 days',drill:'kpi-duesoon',
+       tip:'Initiatives with at least one epic whose Target Date falls within the next 30 days (not yet overdue).'},
+      {label:'Avg Progress',value:avgAll+'%',bar:C.green,sub:'across initiatives',drill:'kpi-avg',
+       tip:'Average of each initiative\'s own avg % done. Each initiative\'s avg = mean Pct Done of all its epics with a value.'},
     ];
   } else {
     const pcts=active.map(pct).filter(x=>x!==null);
@@ -322,12 +332,18 @@ function computeKPIs(){
     const ovd=active.filter(d=>{const o=overdueDays(d);return o!==null&&o>0;}).length;
     const due=active.filter(d=>{const o=overdueDays(d);return o!==null&&o<0&&o>=-30;}).length;
     return [
-      {label:'Total Epics',value:DATA.length,bar:'#D7DCE3',sub:'across all statuses',drill:'kpi-total'},
-      {label:'Active',value:active.length,bar:C.blue,sub:'In Progress + Blocked',drill:'kpi-active'},
-      {label:'Blocked',value:blocked.length,bar:C.red,sub:Math.round(blocked.length/active.length*100)+'% of active',drill:'kpi-blocked'},
-      {label:'Overdue',value:ovd,bar:C.red,sub:'past target date',drill:'kpi-overdue'},
-      {label:'Due Soon',value:due,bar:C.amber,sub:'within next 30 days',drill:'kpi-duesoon'},
-      {label:'Avg Progress',value:avg+'%',bar:C.green,sub:'across active epics',drill:'kpi-avg'},
+      {label:'Total Epics',value:DATA.length,bar:'#D7DCE3',sub:'across all statuses',drill:'kpi-total',
+       tip:'All epics in the Stakeholder View sheet — active, backlog, on hold, and done — regardless of status.'},
+      {label:'Active',value:active.length,bar:C.blue,sub:'In Progress + Blocked',drill:'kpi-active',
+       tip:'Epics with status: In Progress, Blocked, Pending Prod Deploy, or Pending Sync. These are the epics with ongoing work.'},
+      {label:'Blocked',value:blocked.length,bar:C.red,sub:Math.round(blocked.length/active.length*100)+'% of active',drill:'kpi-blocked',
+       tip:'Epics explicitly marked as Blocked. The % shown is blocked as a share of all active epics.'},
+      {label:'Overdue',value:ovd,bar:C.red,sub:'past target date',drill:'kpi-overdue',
+       tip:'Active epics whose Target Date field is set and is in the past. Epics without a target date are excluded.'},
+      {label:'Due Soon',value:due,bar:C.amber,sub:'within next 30 days',drill:'kpi-duesoon',
+       tip:'Active epics with a Target Date within the next 30 days that are not yet overdue.'},
+      {label:'Avg Progress',value:avg+'%',bar:C.green,sub:'across active epics',drill:'kpi-avg',
+       tip:'Mean of the Pct Done field across all active epics that have a value. Epics with no % reported are excluded from the average.'},
     ];
   }
 }
@@ -337,9 +353,12 @@ function renderKPIs(){
   window._kpiData={};
   document.getElementById('kpi-grid').innerHTML=kpis.map(k=>{
     window._kpiData[k.drill]=k;
+    const tip=k.tip?'<span class="kpi-tooltip">?<span class="kpi-tooltip-box">'+k.tip+'</span></span>':'';
     return '<div class="kpi" data-act="kpiDrill" data-arg="'+k.drill+'">'+
       '<div class="kpibar" style="background:'+k.bar+'"></div>'+
-      '<div class="kpilabel">'+k.label+'</div>'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">'+
+        '<div class="kpilabel" style="margin-bottom:0">'+k.label+'</div>'+tip+
+      '</div>'+
       '<div class="mono kpival">'+k.value+'</div>'+
       '<div class="kpisub">'+k.sub+'</div></div>';
   }).join('');
@@ -445,7 +464,7 @@ function renderLoadedTeams(){
   } else {
     active.forEach(d=>teamsOf(d).forEach(t=>{tc[t]=(tc[t]||0)+1;}));
   }
-  const top=Object.entries(tc).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const top=Object.entries(tc).filter(([n])=>n&&n!=='\u2014'&&n!=='-'&&n.trim()!=='').sort((a,b)=>b[1]-a[1]).slice(0,5);
   const max=top[0]?top[0][1]:1;
   document.getElementById('loaded-teams').innerHTML=top.map(([n,v])=>
     '<div style="display:flex;align-items:center;gap:12px"><div style="font-size:12px;color:#3A4351;width:170px;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+n+'">'+n+'</div><div style="flex:1;height:7px;background:#F0F1F4;border-radius:4px;overflow:hidden"><div style="width:'+(v/max*100)+'%;height:100%;background:'+C.blue+';border-radius:4px"></div></div><div class="mono" style="font-size:12px;font-weight:600;color:#2B333F;width:22px;text-align:right">'+v+'</div></div>'
