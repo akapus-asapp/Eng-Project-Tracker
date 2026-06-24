@@ -142,6 +142,27 @@ body{background:#F4F5F7;font-family:'Public Sans',system-ui,sans-serif;color:#1F
   <!-- INITIATIVES -->
   <div class="panel" id="panel-initiatives">
     <div style="display:flex;align-items:center;gap:9px;margin-bottom:18px;flex-wrap:wrap" id="init-status-chips"></div>
+
+    <!-- Risk by initiative chart -->
+    <section class="card" style="padding:18px;margin-bottom:20px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <div style="display:flex;align-items:center;gap:7px">
+            <div style="font-size:14px;font-weight:700;letter-spacing:-0.01em">Risk by initiative</div>
+            <span class="sec-tooltip">?<span class="sec-tooltip-box">Each bar shows the epic count per initiative broken down by status. Click any number to drill into the epics for that combination.</span></span>
+          </div>
+          <div style="font-size:11.5px;color:#8A93A2;margin-top:2px">Epic status breakdown per initiative — click any bar to drill down</div>
+        </div>
+        <div style="display:flex;gap:14px;flex-shrink:0">
+          <div style="display:flex;align-items:center;gap:6px"><div style="width:9px;height:9px;border-radius:2px;background:#2E9E6B"></div><span style="font-size:11px;color:#5B6573">On track</span></div>
+          <div style="display:flex;align-items:center;gap:6px"><div style="width:9px;height:9px;border-radius:2px;background:#DD9128"></div><span style="font-size:11px;color:#5B6573">At risk</span></div>
+          <div style="display:flex;align-items:center;gap:6px"><div style="width:9px;height:9px;border-radius:2px;background:#D14343"></div><span style="font-size:11px;color:#5B6573">Blocked</span></div>
+          <div style="display:flex;align-items:center;gap:6px"><div style="width:9px;height:9px;border-radius:2px;background:#D7DCE3"></div><span style="font-size:11px;color:#5B6573">Inactive</span></div>
+        </div>
+      </div>
+      <div id="init-risk-chart" style="display:flex;flex-direction:column;gap:8px"></div>
+    </section>
+
     <div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start">
       <section class="card" style="overflow:hidden">
         <div style="display:grid;grid-template-columns:62px 1fr 92px 104px 50px 116px 84px;gap:12px;padding:11px 18px;border-bottom:1px solid #EEF0F3;background:#FAFBFC;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#9aa2ae">
@@ -502,14 +523,57 @@ function renderLoadedTeams(){
 }
 
 // ===== INITIATIVES TAB (table + collapsible side) =====
+function renderInitRiskChart(){
+  // Sort: blocked first, then at-risk, then on-track; sub-sort by total desc
+  const sevOrder={blocked:0,atrisk:1,ontrack:2};
+  const sorted=[...INITS].sort((a,b)=>(sevOrder[a.status]??3)-(sevOrder[b.status]??3)||b.epics.length-a.epics.length);
+  const maxEpics=Math.max(1,...sorted.map(it=>it.epics.length));
+
+  // Status buckets per initiative
+  function buckets(it){
+    return {
+      blocked: it.epics.filter(d=>d.Status==='Blocked'),
+      atrisk:  it.epics.filter(d=>isHighRisk(d)&&d.Status!=='Blocked'),
+      ontrack: it.epics.filter(d=>isActive(d)&&!isHighRisk(d)&&d.Status!=='Blocked'),
+      inactive:it.epics.filter(d=>!isActive(d)),
+    };
+  }
+
+  document.getElementById('init-risk-chart').innerHTML=sorted.map(it=>{
+    const b=buckets(it);
+    const total=it.epics.length;
+    const bar=(rows,color,cat)=>rows.length?
+      '<div style="height:100%;background:'+color+';width:'+(rows.length/maxEpics*100).toFixed(1)+'%;cursor:pointer;flex-shrink:0" '+
+      'data-act="initRiskDrill" data-arg="'+INITS.indexOf(it)+'||'+cat+'" title="'+rows.length+' '+cat+'"></div>':'';
+    return '<div style="display:flex;align-items:center;gap:12px">'+
+      '<div style="font-size:12px;color:#3A4351;width:190px;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+it.name+'">'+it.name+'</div>'+
+      '<div style="flex:1;height:18px;border-radius:4px;overflow:hidden;display:flex;background:#F0F1F4">'+
+        bar(b.blocked,C.red,'blocked')+
+        bar(b.atrisk,C.amber,'atrisk')+
+        bar(b.ontrack,C.green,'ontrack')+
+        bar(b.inactive,'#D7DCE3','inactive')+
+      '</div>'+
+      '<div class="mono" style="font-size:11.5px;font-weight:600;color:#2F6BD8;text-decoration:underline;width:28px;text-align:right;cursor:pointer" '+
+      'data-act="initDrill" data-arg="'+INITS.indexOf(it)+'">'+total+'</div>'+
+    '</div>';
+  }).join('');
+}
 function renderInitTab(){
   const ST={ontrack:{label:'On track',dot:C.green,bg:'#E7F4EE',fg:'#218456'},atrisk:{label:'At risk',dot:C.amber,bg:'#FBF2E2',fg:'#A66E18'},blocked:{label:'Blocked',dot:C.red,bg:'#FBEAEA',fg:'#B53636'}};
   const counts={all:INITS.length,ontrack:INITS.filter(i=>i.status==='ontrack').length,atrisk:INITS.filter(i=>i.status==='atrisk').length,blocked:INITS.filter(i=>i.status==='blocked').length};
   document.getElementById('init-status-chips').innerHTML=[['all','All'],['ontrack','On track'],['atrisk','At risk'],['blocked','Blocked']].map(([k,l])=>
     '<button class="statuschip'+(state.status===k?' active':'')+'" data-act="initStatus" data-arg="'+k+'">'+l+' <span class="mono" style="opacity:.6">'+(counts[k]!==undefined?counts[k]:'')+'</span></button>'
   ).join('');
-  const list=state.status==='all'?INITS:INITS.filter(i=>i.status===state.status);
+
+  // c. Sort: blocked first, then atrisk, then ontrack; within each group by avg progress desc
+  const sevOrder={blocked:0,atrisk:1,ontrack:2};
+  const base=state.status==='all'?INITS:INITS.filter(i=>i.status===state.status);
+  const list=[...base].sort((a,b)=>(sevOrder[a.status]??3)-(sevOrder[b.status]??3)||b.avg-a.avg);
   window._initRows=list;
+
+  // a. Progress tooltip text
+  const progTip='Mean of the Pct Done field across all epics in this initiative that have a value. Epics without a % reported are excluded. Status color: red = blocked, amber = at risk, green = on track.';
+
   document.getElementById('init-tbody').innerHTML=list.map((it,i)=>{
     const st=ST[it.status];
     const team=it.teams.slice(0,2).join(', ')+(it.teams.length>2?' +'+(it.teams.length-2):'');
@@ -519,14 +583,25 @@ function renderInitTab(){
       '<div style="font-size:11.5px;color:#5B6573;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+team+'">'+(team||'\u2014')+'</div>'+
       '<div><span class="pill" style="background:'+st.bg+';color:'+st.fg+'"><span style="width:6px;height:6px;border-radius:50%;background:'+st.dot+';display:inline-block"></span>'+st.label+'</span></div>'+
       '<div class="mono" style="font-size:11.5px;color:#5B6573;text-align:right">'+it.epics.length+'</div>'+
-      '<div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:6px;background:#F0F1F4;border-radius:4px;overflow:hidden"><div style="width:'+it.avg+'%;height:100%;background:'+(it.status==='blocked'?C.red:it.status==='atrisk'?C.amber:C.green)+';border-radius:4px"></div></div><div class="mono" style="font-size:11px;color:#5B6573;width:30px;text-align:right">'+it.avg+'%</div></div>'+
+      '<div style="display:flex;align-items:center;gap:6px">'+
+        '<div style="flex:1;height:6px;background:#F0F1F4;border-radius:4px;overflow:hidden"><div style="width:'+it.avg+'%;height:100%;background:'+(it.status==='blocked'?C.red:it.status==='atrisk'?C.amber:C.green)+';border-radius:4px"></div></div>'+
+        '<div class="mono" style="font-size:11px;color:#5B6573;width:30px;text-align:right">'+it.avg+'%</div>'+
+        '<span class="kpi-tooltip" style="width:13px;height:13px;font-size:8px">?<span class="kpi-tooltip-box" style="width:210px">'+progTip+'</span></span>'+
+      '</div>'+
       '<div class="mono" style="font-size:11px;text-align:right;color:#8A93A2">'+it.active.length+'</div></div>';
   }).join('');
-  // side: active by initiative (collapsible)
+
+  // b. Active by initiative — clickable rows
   const bi=[...INITS].sort((a,b)=>b.active.length-a.active.length).slice(0,12);
   const max=bi[0]?bi[0].active.length:1;
   document.getElementById('byinit-bars').innerHTML=bi.map(it=>
-    '<div><div style="display:flex;justify-content:space-between;margin-bottom:5px"><div style="font-size:12px;color:#3A4351;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px">'+it.name+'</div><div class="mono" style="font-size:11.5px;font-weight:600;color:#2B333F">'+it.active.length+'</div></div><div style="height:6px;background:#F0F1F4;border-radius:4px;overflow:hidden"><div style="width:'+(it.active.length/max*100)+'%;height:100%;background:'+C.blue+';border-radius:4px"></div></div></div>'
+    '<div style="cursor:pointer" data-act="initDrill" data-arg="'+INITS.indexOf(it)+'">'+
+      '<div style="display:flex;justify-content:space-between;margin-bottom:5px">'+
+        '<div style="font-size:12px;color:#3A4351;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px" title="'+it.name+'">'+it.name+'</div>'+
+        '<div class="mono" style="font-size:11.5px;font-weight:600;color:#2F6BD8;text-decoration:underline">'+it.active.length+'</div>'+
+      '</div>'+
+      '<div style="height:6px;background:#F0F1F4;border-radius:4px;overflow:hidden"><div style="width:'+(it.active.length/max*100)+'%;height:100%;background:'+C.blue+';border-radius:4px"></div></div>'+
+    '</div>'
   ).join('');
 }
 function initStatus(k){state.status=k;renderInitTab();}
@@ -683,6 +758,20 @@ function initDrill(idx){
     .map(d=>({id:d.Key,name:d['Epic Name'],owner:d.PM||d['Eng Lead']||'',status:d.Status,statusColor:statusColorOf(d),value:pct(d)!==null?pct(d)+'%':'\u2014'}));
   openDrawer(it.name,it.epics.length+' epics \u00b7 '+it.active.length+' active \u00b7 '+it.avg+'% avg progress','Progress',rows);
 }
+function initRiskDrill(arg){
+  const parts=arg.split('||');
+  const it=INITS[parseInt(parts[0])];
+  const cat=parts[1];
+  if(!it)return;
+  const catLabels={blocked:'Blocked',atrisk:'At risk',ontrack:'On track',inactive:'Inactive'};
+  let rows;
+  if(cat==='blocked') rows=it.epics.filter(d=>d.Status==='Blocked');
+  else if(cat==='atrisk') rows=it.epics.filter(d=>isHighRisk(d)&&d.Status!=='Blocked');
+  else if(cat==='ontrack') rows=it.epics.filter(d=>isActive(d)&&!isHighRisk(d)&&d.Status!=='Blocked');
+  else rows=it.epics.filter(d=>!isActive(d));
+  if(!rows.length)return;
+  openDrawer(it.name+' \u00b7 '+(catLabels[cat]||cat),rows.length+' epics in this category.','Progress',rows.map(epicToRow));
+}
 
 // ===== ROW CONVERTERS =====
 function epicToRow(d){return {id:d.Key,name:d['Epic Name'],owner:d.PM||d['Eng Lead']||'',status:d.Status,statusColor:statusColorOf(d),value:pct(d)!==null?pct(d)+'%':'\u2014'};}
@@ -775,6 +864,7 @@ function render(){
   renderInsights();
   renderHealth();
   renderLoadedTeams();
+  renderInitRiskChart();
   renderInitTab();
   renderAnalytics();
   renderTrends();
@@ -804,6 +894,7 @@ document.addEventListener('click', function(e){
     case 'kpiDrill': kpiDrill(arg); break;
     case 'insDrill': insDrill(arg); break;
     case 'initDrill': initDrill(arg); break;
+    case 'initRiskDrill': initRiskDrill(arg); break;
     case 'healthDrill': healthDrill(arg); break;
     case 'teamDrill': teamDrill(arg); break;
     case 'trendDrill': trendDrill(arg); break;
