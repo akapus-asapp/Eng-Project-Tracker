@@ -206,15 +206,15 @@ a{color:inherit;text-decoration:none}
       <div class="header-chip" id="header-age-chip">Data age: -</div>
       <div class="header-divider"></div>
       <div class="header-updated" id="header-next">Next refresh: -</div>
-      <button class="btn-primary" onclick="exportAllCSV()">Export CSV</button>
+      <button class="btn-primary" data-act="exportAllCSV">Export CSV</button>
     </div>
   </div>
   <nav class="tab-nav">
-    <button class="tab-nav-btn active" onclick="switchTab('overview',this)">Overview</button>
-    <button class="tab-nav-btn" onclick="switchTab('initiatives',this)">Initiatives</button>
-    <button class="tab-nav-btn" onclick="switchTab('analytics',this)">Analytics</button>
-    <button class="tab-nav-btn" onclick="switchTab('trends',this)">Trends</button>
-    <button class="tab-nav-btn" onclick="switchTab('epics',this)">Epics</button>
+    <button class="tab-nav-btn active" data-act="switchTab" data-arg="overview">Overview</button>
+    <button class="tab-nav-btn" data-act="switchTab" data-arg="initiatives">Initiatives</button>
+    <button class="tab-nav-btn" data-act="switchTab" data-arg="analytics">Analytics</button>
+    <button class="tab-nav-btn" data-act="switchTab" data-arg="trends">Trends</button>
+    <button class="tab-nav-btn" data-act="switchTab" data-arg="epics">Epics</button>
     <div style="flex:1"></div>
   </nav>
 </header>
@@ -383,11 +383,11 @@ a{color:inherit;text-decoration:none}
         </div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px" id="epics-tab-bar">
-        <button class="status-chip active" onclick="showEpicsTab('stalled',this)">Stalled</button>
-        <button class="status-chip" onclick="showEpicsTab('blocked',this)">Blocked longest</button>
-        <button class="status-chip" onclick="showEpicsTab('overdue',this)">Past deadline</button>
-        <button class="status-chip" onclick="showEpicsTab('inactive',this)">No activity 30d+</button>
-        <button class="status-chip" onclick="showEpicsTab('almostdone',this)">Almost done 80%+</button>
+        <button class="status-chip active" data-act="showEpicsTab" data-arg="stalled">Stalled</button>
+        <button class="status-chip" data-act="showEpicsTab" data-arg="blocked">Blocked longest</button>
+        <button class="status-chip" data-act="showEpicsTab" data-arg="overdue">Past deadline</button>
+        <button class="status-chip" data-act="showEpicsTab" data-arg="inactive">No activity 30d+</button>
+        <button class="status-chip" data-act="showEpicsTab" data-arg="almostdone">Almost done 80%+</button>
       </div>
       <div id="epics-table-wrap" style="overflow-x:auto"></div>
     </div>
@@ -396,16 +396,16 @@ a{color:inherit;text-decoration:none}
 </main>
 
 <!-- == DETAIL DRAWER == -->
-<div class="drawer-overlay" id="drawer" onclick="closeDrawer(event)">
+<div class="drawer-overlay" id="drawer" data-act="closeDrawerBackdrop">
   <div class="drawer-backdrop"></div>
-  <div class="drawer-panel" onclick="event.stopPropagation()">
+  <div class="drawer-panel" data-act="stop">
     <div class="drawer-header">
       <div class="flex items-center justify-between gap-16">
         <div>
           <div class="drawer-eyebrow">Drill-down</div>
           <div class="drawer-title" id="drawer-title"></div>
         </div>
-        <button class="drawer-close" onclick="closeDrawer()">x</button>
+        <button class="drawer-close" data-act="closeDrawer">x</button>
       </div>
       <div class="drawer-def" id="drawer-def"></div>
     </div>
@@ -416,7 +416,7 @@ a{color:inherit;text-decoration:none}
       <div id="drawer-rows"></div>
     </div>
     <div class="drawer-footer">
-      <button class="btn-primary" style="flex:1" onclick="closeDrawer()">Close</button>
+      <button class="btn-primary" style="flex:1" data-act="closeDrawer">Close</button>
     </div>
   </div>
 </div>
@@ -514,7 +514,7 @@ function renderKPIs() {
   kpis.forEach(k => { window._kpiDrills[k.drillKey] = k; });
 
   document.getElementById('kpi-grid').innerHTML = kpis.map((k,i) => `
-    <div class="kpi-card" onclick="openKpiDrill('${k.drillKey}')">
+    <div class="kpi-card" data-act="openKpiDrill" data-arg="${k.drillKey}">
       <div class="kpi-bar" style="background:${k.bar}"></div>
       <div class="kpi-label">${k.label}</div>
       <div class="flex items-center gap-8">
@@ -648,7 +648,7 @@ function renderInsights() {
   // Chips
   const chips = ['all','critical','warning','watch','win'];
   document.getElementById('insight-chips').innerHTML =
-    chips.map(k=>`<button class="ichip ${_insightFilter===k?'active':''}" onclick="filterInsights('${k}')">${k==='all'?'All':(SEV[k]&&SEV[k].label)||k} <span style="font-family:'IBM Plex Mono',monospace;font-size:10px">${counts[k]}</span></button>`).join('') +
+    chips.map(k=>`<button class="ichip ${_insightFilter===k?'active':''}" data-act="filterInsights" data-arg="${k}">${k==='all'?'All':(SEV[k]&&SEV[k].label)||k} <span style="font-family:'IBM Plex Mono',monospace;font-size:10px">${counts[k]}</span></button>`).join('') +
     `<span class="insight-count">${(_insightFilter==='all'?_insights:_insights.filter(i=>i.sev===_insightFilter)).length} of ${_insights.length}</span>`;
 
   renderInsightList();
@@ -662,7 +662,7 @@ function filterInsights(f) {
 function renderInsightList() {
   const list = _insightFilter==='all' ? _insights : _insights.filter(i=>i.sev===_insightFilter);
   document.getElementById('insights-list').innerHTML = list.map((ins,i)=>`
-    <div class="insight-row" onclick="openInsightDrill(${_insights.indexOf(ins)})">
+    <div class="insight-row" data-act="openInsightDrill" data-arg="${_insights.indexOf(ins)}">
       <div class="insight-dot" style="background:${SEV[ins.sev].color}"></div>
       <div style="flex:1;min-width:0">
         <div class="insight-text">${ins.text}</div>
@@ -743,7 +743,7 @@ function renderInitiativesTab() {
   // Status chips
   const stCounts={all:allInits.length,ontrack:allInits.filter(x=>x.status==='ontrack').length,atrisk:allInits.filter(x=>x.status==='atrisk').length,blocked:allInits.filter(x=>x.status==='blocked').length};
   document.getElementById('init-status-bar').innerHTML =
-    ['all','ontrack','atrisk','blocked'].map(k=>`<button class="status-chip ${k==='all'?'active':''}" onclick="filterInits('${k}',this)">${k==='all'?'All':k==='ontrack'?'On track':k==='atrisk'?'At risk':'Blocked'} <span style="font-family:'IBM Plex Mono',monospace;font-size:10px">${stCounts[k]}</span></button>`).join('') +
+    ['all','ontrack','atrisk','blocked'].map(k=>`<button class="status-chip ${k==='all'?'active':''}" data-act="filterInits" data-arg="${k}">${k==='all'?'All':k==='ontrack'?'On track':k==='atrisk'?'At risk':'Blocked'} <span style="font-family:'IBM Plex Mono',monospace;font-size:10px">${stCounts[k]}</span></button>`).join('') +
     '<div style="flex:1"></div>';
 
   // By team bars
@@ -796,7 +796,7 @@ function renderInitTable() {
   document.getElementById('init-table-body').innerHTML = list.map((r,i)=>{
     const st=ST[r.status];
     const team=r.teams.slice(0,2).join(', ')+(r.teams.length>2?` +${r.teams.length-2}`:'');
-    return `<div class="init-row" onclick="openInitDrill(${window._allInits.indexOf(r)})">
+    return `<div class="init-row" data-act="openInitDrill" data-arg="${window._allInits.indexOf(r)}">
       <div class="init-key mono">#${i+1}</div>
       <div style="min-width:0">
         <div class="init-name">${r.name}</div>
@@ -968,8 +968,8 @@ function renderEpicsTab() {
   // Team filter
   const teams = [...new Set(DATA.flatMap(d=>(d['Contributing Teams']||'').split(';').map(t=>t.trim()).filter(Boolean)))].sort();
   document.getElementById('team-filter-bar').innerHTML =
-    `<button class="status-chip active" onclick="setTeamF(null,this)">All</button>` +
-    teams.map(t=>`<button class="status-chip" onclick="setTeamF('${t.replace(/'/g,"\'")}',this)">${t}</button>`).join('');
+    `<button class="status-chip active" data-act="setTeamF" data-arg="">All</button>` +
+    teams.map(t=>`<button class="status-chip" data-act="setTeamF" data-arg="${t.replace(/"/g,'&quot;')}">${t}</button>`).join('');
   showEpicsTab('stalled', document.querySelector('#epics-tab-bar button'));
 }
 
@@ -978,12 +978,13 @@ function setTeamF(team, btn) {
   document.querySelectorAll('#team-filter-bar button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   const active_btn = document.querySelector('#epics-tab-bar button.active');
-  if (active_btn) showEpicsTab(active_btn.textContent.trim().toLowerCase().replace(/[^a-z]/g,''), active_btn);
+  if (active_btn) showEpicsTab(window._currentEpicType||'stalled', active_btn);
 }
 
 function showEpicsTab(type, btn) {
+  window._currentEpicType = type;
   document.querySelectorAll('#epics-tab-bar button').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
+  if (btn) btn.classList.add('active');
   const today = new Date();
   let rows=[], title='', metric='';
 
@@ -1025,7 +1026,7 @@ function showEpicsTab(type, btn) {
         const sprint=(r['Active Sprint']||'').includes('Active')?'<span style="color:#2E9E6B;font-weight:700">In sprint</span>':'<span style="color:#ccc">--</span>';
         const pct=r['Pct Done']!==null?r['Pct Done']:0;
         return `<tr>
-          <td><span onclick="window.open('${JIRA}${r.Key}','_blank')" style="color:#1a56db;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;cursor:pointer">${r.Key}</span></td>
+          <td><span data-act="openJira" data-arg="${r.Key}" style="color:#1a56db;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;cursor:pointer">${r.Key}</span></td>
           <td style="max-width:260px"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r['Epic Name']}</div></td>
           <td><span class="status-pill" style="font-size:10.5px;background:${dc}18;color:${dc}"><span style="width:5px;height:5px;border-radius:50%;background:${dc};display:inline-block;margin-right:4px"></span>${r.Status}</span></td>
           <td style="text-align:center">${sprint}</td>
@@ -1036,7 +1037,7 @@ function showEpicsTab(type, btn) {
         </tr>`;
       }).join('')}</tbody>
     </table>
-    <div style="padding:10px 0;font-size:11px;color:#9aa2ae">${rows.length} epics | <button style="background:none;border:none;color:#2F6BD8;cursor:pointer;font-size:11px;font-weight:600" onclick="exportEpicsCSV(window._lastEpicsRows,window._lastEpicsTitle)">Export CSV</button></div>`;
+    <div style="padding:10px 0;font-size:11px;color:#9aa2ae">${rows.length} epics | <button style="background:none;border:none;color:#2F6BD8;cursor:pointer;font-size:11px;font-weight:600" data-act="exportEpicsCSV">Export CSV</button></div>`;
   window._lastEpicsRows = rows;
   window._lastEpicsTitle = title;
 }
@@ -1063,6 +1064,30 @@ function exportAllCSV() {
   a.click();
   URL.revokeObjectURL(a.href);
 }
+
+// == EVENT DELEGATION (Apps Script Caja strips inline onclick) ==
+document.addEventListener('click', function(e) {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  const act = el.getAttribute('data-act');
+  const arg = el.getAttribute('data-arg');
+  switch(act) {
+    case 'switchTab': switchTab(arg, el); break;
+    case 'showEpicsTab': showEpicsTab(arg, el); break;
+    case 'exportAllCSV': exportAllCSV(); break;
+    case 'closeDrawer': closeDrawer(); break;
+    case 'closeDrawerBackdrop': closeDrawer(e); break;
+    case 'stop': e.stopPropagation(); break;
+    case 'openKpiDrill': openKpiDrill(arg); break;
+    case 'filterInsights': filterInsights(arg); break;
+    case 'openInsightDrill': openInsightDrill(parseInt(arg)); break;
+    case 'filterInits': filterInits(arg, el); break;
+    case 'openInitDrill': openInitDrill(parseInt(arg)); break;
+    case 'setTeamF': setTeamF(arg||null, el); break;
+    case 'openJira': window.open('https://asappinc.atlassian.net/browse/'+arg,'_blank'); break;
+    case 'exportEpicsCSV': exportEpicsCSV(window._lastEpicsRows, window._lastEpicsTitle); break;
+  }
+});
 
 // == INIT ==
 renderKPIs();
