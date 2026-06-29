@@ -65,15 +65,25 @@ body{background:#F4F5F7;font-family:'Public Sans',system-ui,sans-serif;color:#1F
       <div class="hdr-logo"><div style="width:13px;height:13px;border:2px solid #fff;border-radius:3px"></div></div>
       <div style="min-width:0">
         <div style="font-size:15px;font-weight:700;letter-spacing:-0.01em;line-height:1.1">ASAPP Engineering Pulse</div>
-        <div id="hdr-sub" style="font-size:11.5px;color:#8A93A2;line-height:1.3">Portfolio delivery health &amp; execution risk</div>
+        <div style="font-size:11.5px;color:#8A93A2;line-height:1.3">Portfolio delivery health &amp; execution risk</div>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:10px;flex:0 0 auto">
-      <div class="hdr-chip">All portfolios <span style="color:#B8BFC9;font-size:10px">▾</span></div>
-      <div class="hdr-chip">Rolling 90 days <span style="color:#B8BFC9;font-size:10px">▾</span></div>
-      <div style="height:22px;width:1px;background:#E5E7EC"></div>
+    <div style="display:flex;align-items:center;gap:16px;flex:0 0 auto">
+      <div style="display:flex;align-items:stretch;gap:0;border:1px solid #E5E7EC;border-radius:9px;background:#fff;overflow:hidden">
+        <div style="display:flex;flex-direction:column;padding:7px 14px;border-right:1px solid #F0F1F4">
+          <div style="font-size:9.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#B8BFC9;margin-bottom:2px">Data</div>
+          <div id="hdr-data-date" class="mono" style="font-size:11.5px;font-weight:600;color:#3A4351">—</div>
+        </div>
+        <div style="display:flex;flex-direction:column;padding:7px 14px;border-right:1px solid #F0F1F4">
+          <div style="font-size:9.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#B8BFC9;margin-bottom:2px">Age</div>
+          <div id="hdr-data-age" class="mono" style="font-size:11.5px;font-weight:600;color:#3A4351">—</div>
+        </div>
+        <div style="display:flex;flex-direction:column;padding:7px 14px">
+          <div style="font-size:9.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#B8BFC9;margin-bottom:2px">Next refresh</div>
+          <div id="hdr-next-refresh" class="mono" style="font-size:11.5px;font-weight:600;color:#3A4351">—</div>
+        </div>
+      </div>
       <div id="hdr-updated" style="font-size:11px;color:#A2AAB6;white-space:nowrap">Updated —</div>
-      <div data-act="exportCSV" style="background:#1F2733;color:#fff;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer">Export CSV</div>
     </div>
   </div>
   <nav class="tabnav">
@@ -81,6 +91,7 @@ body{background:#F4F5F7;font-family:'Public Sans',system-ui,sans-serif;color:#1F
     <button class="tabbtn" data-act="switchTab" data-arg="initiatives">Initiatives</button>
     <button class="tabbtn" data-act="switchTab" data-arg="analytics">Analytics</button>
     <button class="tabbtn" data-act="switchTab" data-arg="trends">Trends</button>
+    <button class="tabbtn" data-act="switchTab" data-arg="team">By Team</button>
     <div style="flex:1"></div>
   </nav>
 </header>
@@ -214,7 +225,7 @@ body{background:#F4F5F7;font-family:'Public Sans',system-ui,sans-serif;color:#1F
       <section class="card" style="padding:18px"><div style="font-size:14px;font-weight:700;margin-bottom:4px">Execution age distribution</div><div class="an-unit" style="font-size:11.5px;color:#8A93A2;margin-bottom:18px">active epics by time in execution</div><div id="ea" style="display:flex;align-items:flex-end;gap:10px;height:140px;padding-top:6px"></div></section>
       <section class="card" style="padding:18px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-          <div><div style="font-size:14px;font-weight:700">By PM</div><div class="an-unit" style="font-size:11.5px;color:#8A93A2;margin-top:2px">active epics per PM</div></div>
+          <div><div style="font-size:14px;font-weight:700">By PM</div><div class="an-unit" style="font-size:11.5px;color:#8A93A2;margin-top:2px">active epics per team</div></div>
           <div style="display:flex;gap:14px"><div style="display:flex;align-items:center;gap:6px"><div style="width:9px;height:9px;border-radius:2px;background:#2F6BD8"></div><span style="font-size:11px;color:#5B6573">Done</span></div><div style="display:flex;align-items:center;gap:6px"><div style="width:9px;height:9px;border-radius:2px;background:#D7DCE3"></div><span style="font-size:11px;color:#5B6573">Remaining</span></div></div>
         </div>
         <div id="bypm" style="display:flex;flex-direction:column;gap:11px"></div>
@@ -267,6 +278,33 @@ body{background:#F4F5F7;font-family:'Public Sans',system-ui,sans-serif;color:#1F
     </section>
   </div>
 
+  <!-- BY PM -->
+  <div class="panel" id="panel-team">
+    <!-- PM selector row -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+      <div style="font-size:13px;font-weight:600;color:#5B6573">PM:</div>
+      <div id="team-selector" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    </div>
+
+    <!-- Summary cards for selected PM -->
+    <div id="team-kpi-strip" style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px"></div>
+
+    <!-- Main table -->
+    <section class="card" style="overflow:hidden">
+      <div id="team-table-header" style="display:grid;grid-template-columns:80px 1fr 120px 100px 90px 80px 90px 90px;gap:10px;padding:11px 18px;border-bottom:1px solid #EEF0F3;background:#FAFBFC;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#9aa2ae">
+        <div>Key</div>
+        <div>Epic · PM</div>
+        <div>Initiative</div>
+        <div>Status</div>
+        <div>Progress</div>
+        <div style="text-align:right">Issues</div>
+        <div style="text-align:right">Target</div>
+        <div style="text-align:right">Exec days</div>
+      </div>
+      <div id="team-tbody"></div>
+    </section>
+  </div>
+
 </main>
 
 <!-- DRAWER -->
@@ -302,10 +340,32 @@ body{background:#F4F5F7;font-family:'Public Sans',system-ui,sans-serif;color:#1F
 
 <script>
 (function(){
+// ===== HEADER date card =====
+(function(){
   var now = new Date();
-  var todayStr = now.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   var el = document.getElementById('hdr-updated');
   if (el) el.textContent = 'Updated ' + now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+
+  // Parse HEADER_SUB: "291 epics · data from Jun 23, 2026, 3:43 PM GMT-3 (1 day ago) · Next refresh: Mon, Jun 29"
+  var sub = (function(){var e=document.getElementById('__header_sub');return e?e.textContent:'';})();
+  if(!sub) return;
+
+  var dataDateEl    = document.getElementById('hdr-data-date');
+  var dataAgeEl     = document.getElementById('hdr-data-age');
+  var nextRefreshEl = document.getElementById('hdr-next-refresh');
+
+  // Extract "data from ..."
+  var dataFromM = sub.match(/data from ([^(·]+)/);
+  if (dataFromM && dataDateEl) dataDateEl.textContent = dataFromM[1].trim();
+
+  // Extract "(X day(s) ago)" or "(today)"
+  var ageM = sub.match(/\(([^)]+)\)/);
+  if (ageM && dataAgeEl) dataAgeEl.textContent = ageM[1].trim();
+
+  // Extract "Next refresh: ..."
+  var refreshM = sub.match(/Next refresh:\s*(.+)$/);
+  if (refreshM && nextRefreshEl) nextRefreshEl.textContent = refreshM[1].trim();
+})();
 })();
 </script>
 
@@ -319,7 +379,7 @@ const ACTIVE_S = new Set(['In Progress','Blocked','Pending Prod Deploy','Pending
 const today = new Date();
 
 // ---- State ----
-let state = {tab:'overview', insight:'all', status:'all', level:'epics'};
+let state = {tab:'overview', insight:'all', status:'all', level:'epics', selectedTeam:''};
 
 // ---- Helpers ----
 function isActive(d){return ACTIVE_S.has(d.Status);}
@@ -560,6 +620,7 @@ function renderLoadedTeams(){
 }
 
 // ===== INITIATIVES TAB (table + collapsible side) =====
+function isJiraKey(s){return /^[A-Z][A-Z0-9]+-\d+$/.test((s||'').trim());}
 function renderInitRiskChart(){
   // Risk score: blocked×3 + atrisk×2 + ontrack×1 (inactive ignored)
   function riskScore(it){
@@ -587,7 +648,7 @@ function renderInitRiskChart(){
       '<div style="height:100%;background:'+color+';width:'+pct(rows.length)+';cursor:pointer;flex-shrink:0;transition:opacity .15s" '+
       'data-act="initRiskDrill" data-arg="'+INITS.indexOf(it)+'||'+cat+'" title="'+rows.length+' '+cat+' ('+pct(rows.length)+')"></div>':'';
     return '<div style="display:flex;align-items:center;gap:12px">'+
-      '<div style="font-size:12px;color:#3A4351;width:190px;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+it.name+'">'+it.name+'</div>'+
+      '<div style="font-size:12px;color:'+(isJiraKey(it.name)?'#B08010':'#3A4351')+';width:190px;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+it.name+(isJiraKey(it.name)?' — initiative name looks like a Jira key. Please update in the Sheet.':'')+'">'+(isJiraKey(it.name)?'⚠ ':'')+it.name+'</div>'+
       '<div style="flex:1;height:18px;border-radius:4px;overflow:hidden;display:flex;background:#F0F1F4;min-width:0">'+
         seg(b.blocked,C.red,'blocked')+
         seg(b.atrisk,C.amber,'atrisk')+
@@ -631,7 +692,7 @@ function renderInitTab(){
     const dueColor=isOverdue?C.red:'#8A93A2';
     return '<div class="ins-row" style="display:grid;grid-template-columns:52px 1fr 90px 100px 46px 120px 80px 72px;gap:12px;padding:12px 18px;align-items:center" data-act="initDrill" data-arg="'+INITS.indexOf(it)+'">'+
       '<div class="mono" style="font-size:11px;color:#A2AAB6">#'+(i+1)+'</div>'+
-      '<div style="min-width:0"><div style="font-size:13px;font-weight:600;color:#2B333F;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+it.name+'</div><div style="font-size:11px;color:#A2AAB6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(it.pms.slice(0,2).join(', ')||'\u2014')+'</div></div>'+
+      '<div style="min-width:0"><div style="font-size:13px;font-weight:600;color:'+(isJiraKey(it.name)?'#B08010':'#2B333F')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+it.name+(isJiraKey(it.name)?' — initiative name looks like a Jira key; update in the Sheet':'')+'">'+(isJiraKey(it.name)?'⚠ ':'')+it.name+'</div><div style="font-size:11px;color:#A2AAB6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(it.pms.slice(0,2).join(', ')||'\u2014')+'</div></div>'+
       '<div style="font-size:11.5px;color:#5B6573;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+team+'">'+(team||'\u2014')+'</div>'+
       '<div><span class="pill" style="background:'+st.bg+';color:'+st.fg+'"><span style="width:6px;height:6px;border-radius:50%;background:'+st.dot+';display:inline-block"></span>'+st.label+'</span></div>'+
       '<div class="mono" style="font-size:11.5px;color:#5B6573;text-align:right">'+it.epics.length+'</div>'+
@@ -835,15 +896,14 @@ function renderTrends(){
     const mPct=(t.moving.length/tvMax*100).toFixed(1);
     const sPct=(t.stale.length/tvMax*100).toFixed(1);
     const bPct=(t.blocked.length/tvMax*100).toFixed(1);
-    const iq=i; // index for drill
     return '<div style="display:flex;align-items:center;gap:12px;margin-bottom:9px">'+
       '<div style="font-size:12px;color:#3A4351;width:170px;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+t.name+'">'+t.name+'</div>'+
       '<div style="flex:1;height:18px;border-radius:4px;overflow:hidden;display:flex;background:#F0F1F4;min-width:0">'+
-        (t.moving.length?'<div style="width:'+mPct+'%;background:'+C.green+';height:100%;cursor:pointer" data-act="tvDrill" data-arg="'+iq+'\u001fmoving" title="Moving: '+t.moving.length+'"></div>':'')+
-        (t.stale.length?'<div style="width:'+sPct+'%;background:'+C.amber+';height:100%;cursor:pointer" data-act="tvDrill" data-arg="'+iq+'\u001fstale" title="Stale 90d+: '+t.stale.length+'"></div>':'')+
-        (t.blocked.length?'<div style="width:'+bPct+'%;background:'+C.red+';height:100%;cursor:pointer" data-act="tvDrill" data-arg="'+iq+'\u001fblocked" title="Blocked: '+t.blocked.length+'"></div>':'')+
+        (t.moving.length?'<div style="width:'+mPct+'%;background:'+C.green+';height:100%;cursor:pointer" data-act="tvDrill" data-arg="'+i+'__moving" title="Moving: '+t.moving.length+'"></div>':'')+
+        (t.stale.length?'<div style="width:'+sPct+'%;background:'+C.amber+';height:100%;cursor:pointer" data-act="tvDrill" data-arg="'+i+'__stale" title="Stale 90d+: '+t.stale.length+'"></div>':'')+
+        (t.blocked.length?'<div style="width:'+bPct+'%;background:'+C.red+';height:100%;cursor:pointer" data-act="tvDrill" data-arg="'+i+'__blocked" title="Blocked: '+t.blocked.length+'"></div>':'')+
       '</div>'+
-      '<div class="mono" style="font-size:11.5px;font-weight:600;color:#2F6BD8;text-decoration:underline;width:28px;text-align:right;cursor:pointer;flex-shrink:0" data-act="tvDrill" data-arg="'+iq+'\u001fall">'+t.total+'</div>'+
+      '<div class="mono" style="font-size:11.5px;font-weight:600;color:#2F6BD8;text-decoration:underline;width:28px;text-align:right;cursor:pointer;flex-shrink:0" data-act="tvDrill" data-arg="'+i+'__all">'+t.total+'</div>'+
     '</div>';
   }).join('');
 }
@@ -861,9 +921,10 @@ function trendVeloDrill(i){
   );
 }
 function tvDrill(arg){
-  const parts=arg.split('\u001f');
-  const t=window._tvData?.[parseInt(parts[0])];
-  const cat=parts[1]||'all';
+  const sep=arg.indexOf('__');
+  const idx=sep>=0?parseInt(arg.slice(0,sep)):parseInt(arg);
+  const cat=sep>=0?arg.slice(sep+2):'all';
+  const t=window._tvData?.[idx];
   if(!t)return;
   const catLabels={moving:'Moving',stale:'Stale 90d+',blocked:'Blocked',all:'All'};
   let rows;
@@ -872,17 +933,15 @@ function tvDrill(arg){
   else if(cat==='blocked') rows=t.blocked;
   else rows=[...t.moving,...t.stale,...t.blocked];
   if(!rows.length)return;
-  const metric=cat==='stale'?'Days in status':cat==='blocked'?'Days blocked':'Days exec';
+  const metric=cat==='moving'?'Days exec':'Days in status';
   openDrawer(
     t.name+' \u00b7 '+catLabels[cat],
-    rows.length+' active epics for this team.',
+    rows.length+' active epics for this team in this category.',
     metric,
     rows.map(d=>({
       ...epicToRow(d),
-      value: cat==='stale'||cat==='all' ? (d['Days in Cur Status']||0)+'d'
-           : cat==='blocked' ? (d['Days in Cur Status']||0)+'d'
-           : (d['Days in Execution']||0)+'d'
-    }))
+      value: cat==='moving' ? (d['Days in Execution']||0)+'d' : (d['Days in Cur Status']||0)+'d'
+    })).sort((a,b)=>parseInt(b.value)-parseInt(a.value))
   );
 }
 
@@ -1020,12 +1079,111 @@ function analyticsDrill(type,arg){
     title='Exec age: '+lo+(hi===999?'d+ days':'\u2013'+hi+'d'); def=rows.length+' active epics.'; metric='Days exec';
   } else if(type==='deadline'){
     rows=active.filter(d=>{const o=overdueDays(d);if(o===null)return false;const t=new Date(d['Target Date']);return t.toLocaleDateString('en-US',{month:'short'})===arg;});
-    title='Deadline: '+arg; def=rows.length+' active epics due in this month.'; metric='Target';
+    title='Deadline: '+arg; def=rows.length+' active epics due in '+arg+'.'; metric='Target Date';
   }
   if(rows.length){
-    openDrawer(title,def,metric,rows.map(r=>({...epicToRow(r),value:type==='age'?(r['Days in Execution']||0)+'d':type==='deadline'?(r['Target Date']||'\u2014'):epicToRow(r).value})));
+    // helper to format target date as MM/DD/YYYY
+    function fmtTarget(d){
+      const raw=d['Target Date'];
+      if(!raw||raw==='\u2014'||raw==='-')return '\u2014';
+      const t=new Date(raw);
+      if(isNaN(t))return raw;
+      const m=String(t.getMonth()+1).padStart(2,'0');
+      const dd=String(t.getDate()).padStart(2,'0');
+      const y=t.getFullYear();
+      return m+'/'+dd+'/'+y;
+    }
+    openDrawer(title,def,metric,rows.map(r=>({...epicToRow(r),value:
+      type==='age'?(r['Days in Execution']||0)+'d':
+      type==='deadline'?fmtTarget(r):
+      epicToRow(r).value})));
   }
 }
+// ===== PM TAB =====
+function renderTeamTab(){
+  const teamCounts={};
+  DATA.forEach(d=>teamsOf(d).forEach(t=>{if(t&&t!=='\u2014')teamCounts[t]=(teamCounts[t]||0)+1;}));
+  const teamList=Object.entries(teamCounts).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).map(e=>e[0]);
+  if(!state.selectedTeam||!teamList.includes(state.selectedTeam))state.selectedTeam=teamList[0]||'';
+  document.getElementById('team-selector').innerHTML=teamList.map(t=>
+    '<button class="statuschip'+(state.selectedTeam===t?' active':'')+'" data-act="selectTeam" data-arg="'+t.replace(/"/g,'&quot;')+'">'+
+    t+'<span class="mono" style="opacity:.55;font-size:10.5px;margin-left:4px">'+teamCounts[t]+'</span></button>'
+  ).join('');
+  renderTeamEpics();
+}
+function renderTeamEpics(){
+  const team=state.selectedTeam;
+  if(!team){document.getElementById('team-tbody').innerHTML='';return;}
+  const epics=DATA.filter(d=>teamsOf(d).includes(team));
+  const act=epics.filter(d=>isActive(d));
+  const blk=epics.filter(d=>d.Status==='Blocked');
+  const ovd=epics.filter(d=>overdueDays(d)!==null&&overdueDays(d)>0);
+  const noTgt=epics.filter(d=>overdueDays(d)===null&&(!d['Target Date']||d['Target Date']==='\u2014'));
+  const kpis=[
+    {label:'Total epics',value:epics.length,color:C.blue,sub:'all statuses',fn:()=>epics},
+    {label:'Active',value:act.length,color:C.green,sub:'in execution',fn:()=>act},
+    {label:'Blocked',value:blk.length,color:C.red,sub:'need attention',fn:()=>blk},
+    {label:'Overdue',value:ovd.length,color:C.amber,sub:'past target date',fn:()=>ovd},
+    {label:'No target date',value:noTgt.length,color:'#9aa2ae',sub:'delivery risk',fn:()=>noTgt},
+  ];
+  window._teamTabKpis=kpis;
+  document.getElementById('team-kpi-strip').innerHTML=kpis.map((k,i)=>
+    '<div class="card" style="padding:16px;cursor:'+(k.value>0?'pointer':'default')+'" data-act="teamTabKpiDrill" data-arg="'+i+'">'+
+    '<div style="font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#8A93A2;margin-bottom:8px">'+k.label+'</div>'+
+    '<div class="mono" style="font-size:24px;font-weight:700;color:'+k.color+';line-height:1;margin-bottom:6px;'+(k.value>0?'text-decoration:underline':'')+'">'+k.value+'</div>'+
+    '<div style="font-size:11px;color:#9aa2ae">'+k.sub+'</div></div>'
+  ).join('');
+  const sorted=[...epics].sort((a,b)=>{
+    const sa=a.Status==='Blocked'?0:isHighRisk(a)?1:2;
+    const sb=b.Status==='Blocked'?0:isHighRisk(b)?1:2;
+    if(sa!==sb)return sa-sb;
+    return (pct(a)||0)-(pct(b)||0);
+  });
+  window._teamTabRows=sorted;
+  function fmtD(v){if(!v||v==='\u2014'||v==='-')return '\u2014';const t=new Date(v);if(isNaN(t))return v;return String(t.getMonth()+1).padStart(2,'0')+'/'+String(t.getDate()).padStart(2,'0')+'/'+t.getFullYear();}
+  document.getElementById('team-tbody').innerHTML=sorted.map((d,i)=>{
+    const sc=statusColorOf(d);
+    const p=pct(d);
+    const od=overdueDays(d);
+    const isOvd=od!==null&&od>0;
+    const isJiraInit=/^[A-Z][A-Z0-9]+-\d+$/.test((d.Initiative||'').trim());
+    const initTxt=d.Initiative&&d.Initiative!=='\u2014'?d.Initiative:'\u2014';
+    const kl=/^[A-Z][A-Z0-9]+-\d+$/.test(d.Key)
+      ?'<a href="https://asappinc.atlassian.net/browse/'+d.Key+'" target="_blank" style="color:#2F6BD8;text-decoration:none;font-size:11.5px;font-weight:600;font-family:\'IBM Plex Mono\',monospace">'+d.Key+'</a>'
+      :'<span class="mono" style="font-size:11.5px;color:#2F6BD8">'+d.Key+'</span>';
+    const pmTxt=d.PM&&d.PM!=='\u2014'?d.PM:'';
+    return '<div class="ins-row" style="display:grid;grid-template-columns:80px 1fr 120px 100px 90px 80px 90px 90px;gap:10px;padding:11px 18px;align-items:center;cursor:pointer" data-act="teamTabEpicDrill" data-arg="'+i+'">'+
+      '<div>'+kl+'</div>'+
+      '<div style="min-width:0">'+
+        '<div style="font-size:12.5px;font-weight:600;color:#2B333F;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+d['Epic Name']+'">'+d['Epic Name']+'</div>'+
+        '<div style="font-size:11px;color:#A2AAB6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="PM: '+pmTxt+'">'+pmTxt+'</div>'+
+      '</div>'+
+      '<div style="min-width:0"><span style="font-size:11px;color:#5B6573;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block" title="'+initTxt+'">'+(isJiraInit?'⚠ ':'')+initTxt+'</span></div>'+
+      '<div><span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 8px;border-radius:12px;background:'+sc.bg+';color:'+sc.fg+'"><span style="width:6px;height:6px;border-radius:50%;background:'+sc.dot+';flex-shrink:0"></span>'+d.Status+'</span></div>'+
+      '<div style="display:flex;align-items:center;gap:5px">'+
+        '<div style="flex:1;height:5px;background:#F0F1F4;border-radius:3px;overflow:hidden"><div style="width:'+(p||0)+'%;height:100%;background:'+sc.dot+';border-radius:3px"></div></div>'+
+        '<div class="mono" style="font-size:11px;color:#5B6573;width:28px;text-align:right">'+(p!==null?p+'%':'\u2014')+'</div>'+
+      '</div>'+
+      '<div class="mono" style="font-size:11px;color:#5B6573;text-align:right">'+(d.Issues&&d.Issues!=='\u2014'?d.Issues:'\u2014')+'</div>'+
+      '<div class="mono" style="font-size:11px;text-align:right;color:'+(isOvd?C.red:'#8A93A2')+';font-weight:'+(isOvd?'700':'400')+'">'+fmtD(d['Target Date'])+'</div>'+
+      '<div class="mono" style="font-size:11px;text-align:right;color:#8A93A2">'+(d['Days in Execution']!=null?d['Days in Execution']+'d':'\u2014')+'</div>'+
+    '</div>';
+  }).join('');
+}
+function selectTeam(team){state.selectedTeam=team;renderTeamTab();}
+function teamTabKpiDrill(i){
+  const k=window._teamTabKpis?.[parseInt(i)];if(!k||!k.fn||!k.value)return;
+  openDrawer(state.selectedTeam+' \u00b7 '+k.label,k.value+' epics.','Progress',k.fn().map(epicToRow));
+}
+function teamTabEpicDrill(i){
+  const d=window._teamTabRows?.[parseInt(i)];if(!d)return;
+  const init=d.Initiative&&d.Initiative!=='\u2014'?d.Initiative:'No initiative';
+  openDrawer(d['Epic Name'],d.Key+' \u00b7 '+init+' \u00b7 PM: '+(d.PM||'\u2014'),'% Done',
+    [{id:d.Key,name:d['Epic Name'],owner:d['Eng Lead']||d.PM||'',status:d.Status,statusColor:statusColorOf(d),value:pct(d)!==null?pct(d)+'%':'\u2014'}]
+  );
+}
+
+// ===== EXPORT =====
 function exportCSV(){
   const cols=['Key','Epic Name','Status','Initiative','Priority','Active Sprint','Pct Done','Contributing Teams','Eng Lead','PM','Target Date','Risk','Days in Execution','Days Since Created','Days in Cur Status','Last Updated'];
   const csv=[cols.join(',')].concat(DATA.map(r=>cols.map(c=>'"'+((r[c]==null?'':r[c])+'').replace(/"/g,'""')+'"').join(','))).join('\n');
@@ -1067,11 +1225,11 @@ function render(){
   renderInitTab();
   renderAnalytics();
   renderTrends();
+  renderPMTab();
 }
 
 // header sub
-var hsEl=document.getElementById('hdr-sub');
-if(hsEl)hsEl.textContent='Portfolio delivery health & execution risk \u00b7 '+(HEADER_SUB||DATA.length+' epics');
+// header sub handled by header script above
 
 render();
 </script>
@@ -1098,11 +1256,7 @@ document.addEventListener('click', function(e){
     case 'teamDrill': teamDrill(arg); break;
     case 'trendDrill': trendDrill(arg); break;
     case 'trendVeloDrill': trendVeloDrill(arg); break;
-    case 'tvDrill': {
-      const sep=arg.indexOf('\u001f');
-      tvDrill(sep>=0?arg:arg+'\u001fall');
-      break;
-    }
+    case 'tvDrill': tvDrill(arg); break;
     case 'analyticsDrill': {
       const sep=arg.indexOf('\u001f');
       if(sep>=0){
@@ -1113,7 +1267,9 @@ document.addEventListener('click', function(e){
       }
       break;
     }
-    case 'closeDrawer': closeDrawer(); break;
+    case 'selectTeam': selectTeam(arg); break;
+    case 'teamTabKpiDrill': teamTabKpiDrill(arg); break;
+    case 'teamTabEpicDrill': teamTabEpicDrill(arg); break;
     case 'toggleByInit': {
       var b=document.getElementById('byinit-bars'), t=document.getElementById('byinit-toggle');
       var hidden=b.style.display==='none';
