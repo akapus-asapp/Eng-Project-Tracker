@@ -384,7 +384,7 @@ let state = {tab:'overview', insight:'all', status:'all', level:'epics', selecte
 // ---- Helpers ----
 function isActive(d){return ACTIVE_S.has(d.Status);}
 function inSprint(d){return (d['Active Sprint']||'').includes('Active');}
-function isHighRisk(d){return (d.Risk||'').includes('High');}
+function isHighRisk(d){return (d.Risk||'').includes('High') || (d.Risk||'').includes('Medium');}
 function pct(d){return d['Pct Done']!==null && d['Pct Done']!==undefined ? d['Pct Done'] : null;}
 function overdueDays(d){ if(!d['Target Date']||d['Target Date']==='-'||d['Target Date']==='\u2014')return null; const t=new Date(d['Target Date']); if(isNaN(t))return null; const diff=Math.floor((today-t)/86400000); return diff; }
 function teamsOf(d){return (d['Contributing Teams']||'').split(';').map(t=>t.trim()).filter(t=>t&&t!=='\u2014'&&t!=='-');}
